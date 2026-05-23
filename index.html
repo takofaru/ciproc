@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html>
+	<script src="https://cdn.jsdelivr.net/pyodide/v0.29.4/full/pyodide.js"></script>
+	<body>
+		Hello<br>
+		<input id="image_field" type="file" accept="image/*">
+	</body>
+	<script>
+		let image = document.getElementById("image_field").files[0]
+	</script>
+</html>
