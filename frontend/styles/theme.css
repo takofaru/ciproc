@@ -1,0 +1,12 @@
+@theme {
+  --color-bg: #0f1115;
+  --color-panel: #171b22;
+  --color-border: #2a313c;
+  --color-hover: #242b35;
+  --color-accent: #4f8cff;
+
+  --radius-panel: 12px;
+
+   --font-ui: "DM Sans", "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", monospace;
+}

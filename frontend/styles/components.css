@@ -1,0 +1,97 @@
+@layer components {
+    .home-page {
+        @apply w-screen h-screen flex-center;
+    }
+
+    .home-card {
+        @apply border 
+            border-border 
+            rounded-(--radius-panel)
+            p-8 flex flex-col gap-4 w-105;
+    }
+
+    .home-title {
+        @apply text-4xl font-bold;
+    }
+
+    .home-description {
+        @apply text-zinc-400;
+    }
+
+    .editor-button {
+        @apply px-4 py-2 rounded-lg bg-blue-500
+            hover:bg-blue-400 transition-all duration-150;
+    }
+
+    .editor-layout {
+        @apply h-screen grid grid-rows-[56px_1fr_260px_32px] overflow-hidden;
+    }
+
+    .editor-main {
+        @apply grid grid-cols-[260px_1fr_320px] gap-2 p-2 overflow-hidden;
+    }
+
+    .editor-bottom {
+        @apply p-2;
+    }
+
+    .editor-panel {
+        @apply border 
+            border-border 
+            rounded-(--radius-panel)
+            overflow-hidden;
+    }
+
+    .panel-header {
+        @apply border-b border-zinc-700 px-4 py-2 text-sm font-medium;
+    }
+
+    .panel-body {
+        @apply p-4 h-full overflow-auto;
+    }
+
+    .node-container {
+        @apply min-w-55 bg-zinc-900 border border-zinc-700 rounded-xl;
+    }
+
+    .node-header {
+        @apply px-4 py-2 border-b border-zinc-700 font-medium;
+    }
+
+    .node-content {
+        @apply p-4 flex flex-col gap-4;
+    }
+
+    .input-field {
+        @apply bg-zinc-800 border border-zinc-700 rounded-md px-4 py-2 outline-none;
+    }
+
+    .resize-handle {
+        width: 4px;
+        background: var(--color-border);
+        transition: background 150ms;
+    }
+
+    .resize-handle:hover {
+        background: var(--color-accent);
+    }
+
+    .resize-handle-horizontal {
+        height: 4px;
+        background: var(--color-border);
+        transition: background 150ms;
+    }
+
+    .resize-handle-horizontal:hover {
+        background: var(--color-accent);
+    }
+
+    .canvas-stage {
+    @apply w-full
+        h-full
+        flex
+        items-center
+        justify-center
+        overflow-hidden;
+    }
+}

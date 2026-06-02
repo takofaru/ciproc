@@ -1,0 +1,12 @@
+@utility flex-center {
+    @apply flex items-center justify-center;
+}
+
+@utility panel-padding {
+    @apply p-4;
+}
+
+@utility scrollbar-dark {
+    scrollbar-width: thin;
+}
+
