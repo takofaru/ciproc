@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { projectApi } from "@/lib/api/project-api"
+import { projectApi } from "@/lib/api"
 import { useProjectStore } from "@/stores/project-store"
 
 interface Props {

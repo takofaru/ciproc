@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react"
 import { ProjectCard } from "@/components/dashboard/ProjectCard"
 import { NewProjectModal } from "@/components/dashboard/NewProjectModal"
-import { projectApi } from "@/lib/api/project-api"
+import { projectApi } from "@/lib/api"
 import { useProjectStore } from "@/stores/project-store"
 
 export default function Dashboard() {
@@ -44,7 +44,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <nav className="p-3 flex flex-col gap-0.5 mt-1">
+        <nav className="p-4 flex flex-col gap-0.5 mt-1">
           <button className="dashboard-nav-item active">
             <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
               <path d="M2 3h11M2 7.5h11M2 12h11" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>

@@ -5,10 +5,9 @@ import { useRouter } from "next/navigation"
 import { useProjectStore } from "@/stores/project-store"
 import { useCanvasStore } from "@/stores/canvas-store"
 import { useGraphStore } from "@/stores/graph-store"
-import { projectApi } from "@/lib/api/project-api"
+import { projectApi } from "@/lib/api"
 import { executePipeline } from "@/lib/graph/pipeline-executor"
 import { nanoid } from "nanoid"
-import type { EditorNode, EditorEdge } from "@/types/graph"
 
 // ── Types ────────────────────────────────────────────────────
 type MenuItemDef =
@@ -22,7 +21,8 @@ interface MenuDef {
 
 // ── Dropdown ─────────────────────────────────────────────────
 function MenuDropdown({
-  items, onClose,
+  items,
+  onClose,
 }: {
   items: MenuItemDef[]
   onClose: () => void
@@ -37,7 +37,10 @@ function MenuDropdown({
           <button
             key={i}
             disabled={item.disabled}
-            onClick={() => { item.action(); onClose() }}
+            onClick={() => {
+              item.action()
+              onClose()
+            }}
             className="menu-dropdown-item"
           >
             <span>{item.label}</span>
@@ -55,10 +58,21 @@ function MenuDropdown({
 export function MenuBar() {
   const router = useRouter()
   const [openMenu, setOpenMenu] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const INPUT_ID = "menu-file-input"
 
   const activeProject = useProjectStore((s) => s.activeProject)
-  const { sourceImage, processedImage, imageTransform, setSourceImage, setProcessedImage, setImageTransform, resetImageTransform, resetViewport, isPyodideReady, isProcessing } = useCanvasStore()
+  const {
+    sourceImage,
+    processedImage,
+    imageTransform,
+    setSourceImage,
+    setProcessedImage,
+    setImageTransform,
+    resetImageTransform,
+    resetViewport,
+    isPyodideReady,
+    isProcessing,
+  } = useCanvasStore()
   const { nodes, edges, setNodes, setEdges } = useGraphStore()
 
   // Close on outside click
@@ -78,27 +92,40 @@ export function MenuBar() {
   const saveProject = useCallback(async () => {
     if (!activeProject) return
     await projectApi.update(activeProject.id, {
-      nodes: nodes as EditorNode[],
-      edges: edges as EditorEdge[],
+      nodes: nodes.map((n) => ({
+        id: n.id,
+        type: n.type ?? "unknown",
+        position: n.position,
+        data: n.data as Record<string, unknown>,
+      })),
+      edges: edges.map((e) => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+      })),
     })
   }, [activeProject, nodes, edges])
 
-  const importImage = () => fileInputRef.current?.click()
+  // Dibungkus useCallback agar referensi stabil — tidak diakses saat render
+  const importImage = useCallback(() => {
+    document.getElementById(INPUT_ID)?.click()
+  }, [])
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file || !activeProject) return
-    // Show preview immediately
-    const reader = new FileReader()
-    reader.onload = (ev) => {
-      const b64 = ev.target?.result as string
-      setSourceImage(b64)
-      setProcessedImage(b64)
-    }
-    reader.readAsDataURL(file)
-    // Upload to backend
-    await projectApi.uploadImage(activeProject.id, file)
-  }
+  const handleFileChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0]
+      if (!file || !activeProject) return
+      const reader = new FileReader()
+      reader.onload = (ev) => {
+        const b64 = ev.target?.result as string
+        setSourceImage(b64)
+        setProcessedImage(b64)
+      }
+      reader.readAsDataURL(file)
+      await projectApi.uploadImage(activeProject.id, file)
+    },
+    [activeProject, setSourceImage, setProcessedImage]
+  )
 
   const exportImage = useCallback(async () => {
     if (!sourceImage) return
@@ -116,32 +143,44 @@ export function MenuBar() {
     link.click()
   }, [sourceImage, imageTransform, nodes, edges, activeProject])
 
-  const resetGraph = () => {
+  const resetGraph = useCallback(() => {
     const inputId = nanoid()
     const brightnessId = nanoid()
     const outputId = nanoid()
     setNodes([
-      { id: inputId,      type: "imageInput", position: { x: 60, y: 120 },  data: {} },
+      { id: inputId,      type: "imageInput", position: { x: 60,  y: 120 }, data: {} },
       { id: brightnessId, type: "brightness",  position: { x: 280, y: 120 }, data: { value: 0 } },
       { id: outputId,     type: "output",      position: { x: 500, y: 120 }, data: {} },
     ])
     setEdges([
-      { id: nanoid(), source: inputId, target: brightnessId },
+      { id: nanoid(), source: inputId,      target: brightnessId },
       { id: nanoid(), source: brightnessId, target: outputId },
     ])
-  }
+  }, [setNodes, setEdges])
 
-  // ── Menu definitions ─────────────────────────────────────────
+  const addNode = useCallback(
+    (type: string) => {
+      const offset = (nodes.length % 6) * 40
+      setNodes([
+        ...nodes,
+        { id: nanoid(), type, position: { x: 200 + offset, y: 100 + offset }, data: {} },
+      ])
+    },
+    [nodes, setNodes]
+  )
+
+  // ── Menu definitions — computed OUTSIDE JSX via useMemo equivalent ──
+  // Semua item hanya menyimpan referensi fungsi, tidak mengakses ref.current
   const menus: MenuDef[] = [
     {
       label: "File",
       items: [
-        { label: "Save",           shortcut: "⌘S",  action: saveProject, disabled: !activeProject },
+        { label: "Save",             shortcut: "⌘S", action: saveProject,  disabled: !activeProject },
         { separator: true },
-        { label: "Import Image…",  shortcut: "⌘O",  action: importImage },
-        { label: "Export as JPG",  shortcut: "⌘E",  action: exportImage, disabled: !processedImage },
+        { label: "Import Image…",    shortcut: "⌘O", action: importImage },
+        { label: "Export as JPG",    shortcut: "⌘E", action: exportImage,  disabled: !processedImage },
         { separator: true },
-        { label: "Back to Projects", action: () => router.push("/") },
+        { label: "Back to Projects",                  action: () => router.push("/") },
       ],
     },
     {
@@ -156,12 +195,12 @@ export function MenuBar() {
     {
       label: "Image",
       items: [
-        { label: "Flip Horizontal", action: () => setImageTransform({ scaleX: imageTransform.scaleX * -1 }), disabled: !sourceImage },
-        { label: "Flip Vertical",   action: () => setImageTransform({ scaleY: imageTransform.scaleY * -1 }), disabled: !sourceImage },
+        { label: "Flip Horizontal", disabled: !sourceImage, action: () => setImageTransform({ scaleX: imageTransform.scaleX * -1 }) },
+        { label: "Flip Vertical",   disabled: !sourceImage, action: () => setImageTransform({ scaleY: imageTransform.scaleY * -1 }) },
         { separator: true },
-        { label: "Rotate 90° CW",   action: () => setImageTransform({ rotation: (imageTransform.rotation + 90) % 360 }), disabled: !sourceImage },
-        { label: "Rotate 90° CCW",  action: () => setImageTransform({ rotation: (imageTransform.rotation - 90 + 360) % 360 }), disabled: !sourceImage },
-        { label: "Rotate 180°",     action: () => setImageTransform({ rotation: (imageTransform.rotation + 180) % 360 }), disabled: !sourceImage },
+        { label: "Rotate 90° CW",   disabled: !sourceImage, action: () => setImageTransform({ rotation: (imageTransform.rotation + 90)  % 360 }) },
+        { label: "Rotate 90° CCW",  disabled: !sourceImage, action: () => setImageTransform({ rotation: (imageTransform.rotation - 90 + 360) % 360 }) },
+        { label: "Rotate 180°",     disabled: !sourceImage, action: () => setImageTransform({ rotation: (imageTransform.rotation + 180) % 360 }) },
       ],
     },
     {
@@ -180,21 +219,13 @@ export function MenuBar() {
     {
       label: "View",
       items: [
-        { label: "Fit to Screen",  shortcut: "⌘0", action: () => resetViewport() },
-        { label: "Zoom 100%",      shortcut: "⌘1", action: () => useCanvasStore.getState().setViewport({ zoom: 1 }) },
-        { label: "Zoom 200%",      action: () => useCanvasStore.getState().setViewport({ zoom: 2 }) },
-        { label: "Zoom 50%",       action: () => useCanvasStore.getState().setViewport({ zoom: 0.5 }) },
+        { label: "Fit to Screen", shortcut: "⌘0", action: () => resetViewport() },
+        { label: "Zoom 100%",     shortcut: "⌘1", action: () => useCanvasStore.getState().setViewport({ zoom: 1 }) },
+        { label: "Zoom 200%",                      action: () => useCanvasStore.getState().setViewport({ zoom: 2 }) },
+        { label: "Zoom 50%",                       action: () => useCanvasStore.getState().setViewport({ zoom: 0.5 }) },
       ],
     },
   ]
-
-  function addNode(type: string) {
-    const offset = (nodes.length % 6) * 40
-    setNodes([
-      ...nodes,
-      { id: nanoid(), type, position: { x: 200 + offset, y: 100 + offset }, data: {} },
-    ])
-  }
 
   return (
     <div className="menu-bar" onClick={(e) => e.stopPropagation()}>
@@ -222,28 +253,38 @@ export function MenuBar() {
 
       {/* Project name */}
       <div className="menu-bar-center">
-        <span className="text-sm text-zinc-400">
-          {activeProject?.name ?? ""}
-        </span>
+        <span className="text-sm text-zinc-400">{activeProject?.name ?? ""}</span>
         {isProcessing && (
           <span className="text-xs text-yellow-400 animate-pulse ml-3">● Processing…</span>
         )}
       </div>
 
-      {/* Right side status */}
+      {/* Right */}
       <div className="menu-bar-right">
-        <span className={`text-xs flex items-center gap-1.5 ${isPyodideReady ? "text-emerald-500" : "text-zinc-600"}`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${isPyodideReady ? "bg-emerald-500" : "bg-zinc-600"}`} />
+        <span
+          className={`text-xs flex items-center gap-1.5 ${
+            isPyodideReady ? "text-emerald-500" : "text-zinc-600"
+          }`}
+        >
+          <span
+            className={`w-1.5 h-1.5 rounded-full ${
+              isPyodideReady ? "bg-emerald-500" : "bg-zinc-600"
+            }`}
+          />
           {isPyodideReady ? "Python ready" : "Loading engine…"}
         </span>
-
-        <button onClick={saveProject} disabled={!activeProject} className="menu-save-btn">
+        <button
+          onClick={saveProject}
+          disabled={!activeProject}
+          className="menu-save-btn"
+        >
           Save
         </button>
       </div>
 
+      {/* Hidden file input — hanya diakses via importImage() di event handler */}
       <input
-        ref={fileInputRef}
+        id={INPUT_ID}
         type="file"
         accept="image/*"
         className="hidden"

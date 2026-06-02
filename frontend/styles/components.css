@@ -1,97 +1,242 @@
 @layer components {
-    .home-page {
-        @apply w-screen h-screen flex-center;
-    }
 
-    .home-card {
-        @apply border 
-            border-border 
-            rounded-(--radius-panel)
-            p-8 flex flex-col gap-4 w-105;
-    }
+  /* ── Dashboard ─────────────────────────────────────────── */
+  .dashboard-layout {
+    @apply flex h-screen w-screen overflow-hidden;
+    background: #0d1117;
+  }
 
-    .home-title {
-        @apply text-4xl font-bold;
-    }
+  .dashboard-sidebar {
+    @apply flex flex-col shrink-0 border-r border-zinc-800;
+    width: 220px;
+    background: #0d1117;
+  }
 
-    .home-description {
-        @apply text-zinc-400;
-    }
+  .dashboard-nav-item {
+    @apply flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm
+      text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/60
+      transition-colors w-full text-left;
+  }
 
-    .editor-button {
-        @apply px-4 py-2 rounded-lg bg-blue-500
-            hover:bg-blue-400 transition-all duration-150;
-    }
+  .dashboard-nav-item.active {
+    @apply text-zinc-200 bg-zinc-800;
+  }
 
-    .editor-layout {
-        @apply h-screen grid grid-rows-[56px_1fr_260px_32px] overflow-hidden;
-    }
+  .dashboard-main {
+    @apply flex flex-col flex-1 overflow-hidden;
+  }
 
-    .editor-main {
-        @apply grid grid-cols-[260px_1fr_320px] gap-2 p-2 overflow-hidden;
-    }
+  .dashboard-topbar {
+    @apply flex items-center justify-between px-8 py-5 border-b border-zinc-800 shrink-0;
+  }
 
-    .editor-bottom {
-        @apply p-2;
-    }
+  .dashboard-content {
+    @apply flex-1 overflow-auto px-8 py-6;
+  }
 
-    .editor-panel {
-        @apply border 
-            border-border 
-            rounded-(--radius-panel)
-            overflow-hidden;
-    }
+  .project-grid {
+    @apply grid gap-5;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  }
 
-    .panel-header {
-        @apply border-b border-zinc-700 px-4 py-2 text-sm font-medium;
-    }
+  .project-card {
+    @apply rounded-xl border border-zinc-800 overflow-hidden cursor-pointer
+      transition-all duration-200 hover:border-zinc-600;
+    background: #161b22;
+  }
 
-    .panel-body {
-        @apply p-4 h-full overflow-auto;
-    }
+  .project-card:hover {
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    transform: translateY(-2px);
+  }
 
-    .node-container {
-        @apply min-w-55 bg-zinc-900 border border-zinc-700 rounded-xl;
-    }
+  .project-thumb {
+    @apply relative overflow-hidden;
+    height: 148px;
+    background: #0d1117;
+  }
 
-    .node-header {
-        @apply px-4 py-2 border-b border-zinc-700 font-medium;
-    }
+  .project-thumb-overlay {
+    @apply absolute inset-0 flex items-center justify-center
+      text-white opacity-0 transition-opacity duration-200;
+    background: rgba(0,0,0,0.5);
+  }
 
-    .node-content {
-        @apply p-4 flex flex-col gap-4;
-    }
+  .project-card:hover .project-thumb-overlay {
+    @apply opacity-100;
+  }
 
-    .input-field {
-        @apply bg-zinc-800 border border-zinc-700 rounded-md px-4 py-2 outline-none;
-    }
+  .project-footer {
+    @apply flex items-center gap-2 px-3 py-3 border-t border-zinc-800;
+  }
 
-    .resize-handle {
-        width: 4px;
-        background: var(--color-border);
-        transition: background 150ms;
-    }
+  .context-menu {
+    @apply rounded-lg border border-zinc-700 overflow-hidden shadow-xl;
+    background: #1c2128;
+    min-width: 140px;
+  }
 
-    .resize-handle:hover {
-        background: var(--color-accent);
-    }
+  .context-menu-item {
+    @apply block w-full text-left px-4 py-2 text-sm text-zinc-300
+      hover:bg-zinc-700 transition-colors;
+  }
 
-    .resize-handle-horizontal {
-        height: 4px;
-        background: var(--color-border);
-        transition: background 150ms;
-    }
+  /* ── Modal ─────────────────────────────────────────────── */
+  .modal-backdrop {
+    @apply fixed inset-0 z-50 flex items-center justify-center;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(4px);
+  }
 
-    .resize-handle-horizontal:hover {
-        background: var(--color-accent);
-    }
+  .modal-box {
+    @apply rounded-xl border border-zinc-700 w-full max-w-md;
+    background: #161b22;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+  }
 
-    .canvas-stage {
-    @apply w-full
-        h-full
-        flex
-        items-center
-        justify-center
-        overflow-hidden;
-    }
+  .modal-header {
+    @apply flex items-center justify-between px-5 py-4 border-b border-zinc-800;
+  }
+
+  .modal-body {
+    @apply px-5 py-4 flex flex-col gap-4;
+  }
+
+  .modal-footer {
+    @apply flex items-center justify-end gap-2 px-5 py-4 border-t border-zinc-800;
+  }
+
+  .btn-ghost {
+    @apply px-4 py-2 rounded-lg text-sm text-zinc-400
+      hover:text-zinc-200 hover:bg-zinc-800 transition-colors;
+  }
+
+  /* ── Photoshop Menu Bar ──────────────────────────────────── */
+  .menu-bar {
+    @apply flex items-center gap-0.5 px-2 border-b border-zinc-800 shrink-0 relative z-40;
+    height: 30px;
+    background: #1c2128;
+  }
+
+  .menu-logo {
+    @apply flex items-center px-2 mr-1;
+  }
+
+  .menu-item {
+    @apply px-3 h-full text-xs text-zinc-300 hover:bg-zinc-700/70
+      transition-colors rounded-sm;
+  }
+
+  .menu-item-active {
+    @apply bg-blue-600 text-white hover:bg-blue-600;
+  }
+
+  .menu-bar-center {
+    @apply flex-1 flex items-center justify-center;
+  }
+
+  .menu-bar-right {
+    @apply flex items-center gap-3 px-3;
+  }
+
+  .menu-save-btn {
+    @apply px-3 py-0.5 rounded text-xs bg-blue-600 hover:bg-blue-500
+      text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+
+  .menu-dropdown {
+    @apply absolute top-full left-0 mt-0.5 rounded-lg border border-zinc-700
+      overflow-hidden shadow-2xl z-50 py-1;
+    background: #1c2128;
+    min-width: 220px;
+  }
+
+  .menu-dropdown-item {
+    @apply flex items-center justify-between w-full px-4 py-1.5 text-xs
+      text-zinc-300 hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed
+      transition-colors;
+  }
+
+  .menu-separator {
+    @apply my-1 border-t border-zinc-700/60;
+  }
+
+  .menu-shortcut {
+    @apply text-zinc-500 ml-8;
+  }
+
+  /* ── Editor Layout ───────────────────────────────────────── */
+  .editor-layout {
+    @apply h-screen overflow-hidden;
+    display: grid;
+    grid-template-rows: 30px 1fr 240px 26px;
+  }
+
+  .editor-main {
+    @apply grid overflow-hidden;
+    grid-template-columns: 1fr 260px;
+    gap: 0;
+  }
+
+  .editor-bottom {
+    @apply border-t border-zinc-800;
+  }
+
+  .editor-panel {
+    @apply overflow-hidden border-zinc-800;
+    background: #161b22;
+  }
+
+  .panel-header {
+    @apply px-4 py-2 text-xs font-semibold uppercase tracking-wider
+      text-zinc-500 border-b border-zinc-800;
+  }
+
+  .panel-body {
+    @apply p-3 overflow-auto;
+  }
+
+  /* ── Node Graph ──────────────────────────────────────────── */
+  .node-container {
+    min-width: 200px;
+    background: #1c2128;
+    border: 1px solid #30363d;
+    border-radius: 10px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  }
+
+  .node-container:hover {
+    border-color: #484f58;
+  }
+
+  .node-header {
+    @apply px-3 py-2 text-xs font-semibold text-zinc-300 rounded-t-[9px];
+    border-bottom: 1px solid #30363d;
+  }
+
+  .node-content {
+    @apply p-3 flex flex-col gap-3;
+  }
+
+  /* ── Shared ──────────────────────────────────────────────── */
+  .editor-button {
+    @apply px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500
+      text-white text-sm font-medium transition-colors
+      disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+
+  .input-field {
+    @apply rounded-md px-3 py-1.5 text-sm outline-none;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    color: #e6edf3;
+  }
+
+  .input-field:focus {
+    border-color: #4f8cff;
+  }
+
+  .canvas-stage {
+    @apply relative w-full h-full;
+  }
 }

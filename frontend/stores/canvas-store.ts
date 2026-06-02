@@ -1,5 +1,9 @@
 import { create } from "zustand"
 
+// Dual-matrix architecture per the spec:
+// viewportState = camera (pan/zoom) — never exported
+// imageState    = object transform  — sent to Python on export
+
 export interface ViewportState {
   panX: number
   panY: number
