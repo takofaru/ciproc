@@ -16,6 +16,8 @@ export function CanvasPreview() {
   const viewport = useCanvasStore((s) => s.viewport)
   const imageTransform = useCanvasStore((s) => s.imageTransform)
   const setViewport = useCanvasStore((s) => s.setViewport)
+  const originalWidth = useCanvasStore((s) => s.originalWidth)
+  const originalHeight = useCanvasStore((s) => s.originalHeight)
 
   const drawCanvas = useCallback(() => {
     const canvas = canvasRef.current
@@ -37,8 +39,11 @@ export function CanvasPreview() {
 
       ctx.translate(imageTransform.x, imageTransform.y)
 
-      const cx = img.naturalWidth / 2
-      const cy = img.naturalHeight / 2
+      const displayW = originalWidth > 0 ? originalWidth : img.naturalWidth
+      const displayH = originalHeight > 0 ? originalHeight : img.naturalHeight
+
+      const cx = displayW / 2
+      const cy = displayH / 2
 
       ctx.translate(cx, cy)
 
@@ -47,13 +52,13 @@ export function CanvasPreview() {
 
       ctx.translate(-cx, -cy)
 
-      ctx.drawImage(img, 0, 0)
+      ctx.drawImage(img, 0, 0, displayW, displayH)
 
       ctx.restore()
     }
 
     ctx.restore()
-  }, [viewport, imageTransform])
+  }, [viewport, imageTransform, originalWidth, originalHeight])
 
   useEffect(() => {
     if (!processedImage) {

@@ -23,6 +23,7 @@ export function NodeEditor() {
   const { nodes, edges, onNodesChange, onEdgesChange, onConnect } = useGraphStore()
   const setSelectedNode = useEditorStore((s) => s.setSelectedNode)
   const sourceImage = useCanvasStore((s) => s.sourceImage)
+  const proxyImage = useCanvasStore((s) => s.proxyImage)
   const setProcessedImage = useCanvasStore((s) => s.setProcessedImage)
   const setProcessing = useCanvasStore((s) => s.setProcessing)
   const isPyodideReady = useCanvasStore((s) => s.isPyodideReady)
@@ -36,22 +37,30 @@ export function NodeEditor() {
     initPyodideWorker().then(() => setPyodideReady(true)).catch(console.error)
   }, [setPyodideReady])
 
-  // Re-run pipeline whenever nodes/edges/sourceImage change
+  // Re-run pipeline whenever nodes/edges/image change
   useEffect(() => {
-    if (!sourceImage || !isPyodideReady) return
+    const activeImage = proxyImage || sourceImage
+    if (!activeImage || !isPyodideReady) return
 
-    const key = JSON.stringify({ nodes: nodes.map(n => ({ id: n.id, type: n.type, data: n.data })), edges })
+    // Include a hash/fingerprint of the image in the cache key to detect image changes
+    const imageFingerprint = activeImage.length + activeImage.slice(-50)
+    const key = JSON.stringify({ 
+      nodes: nodes.map(n => ({ id: n.id, type: n.type, data: n.data })), 
+      edges,
+      image: imageFingerprint
+    })
+    
     if (key === lastRunRef.current) return
     lastRunRef.current = key
 
     setProcessing(true)
-    executePipeline(sourceImage, nodes, edges)
+    executePipeline(activeImage, nodes, edges)
       .then((result) => {
         setProcessedImage(result)
       })
       .catch(console.error)
       .finally(() => setProcessing(false))
-  }, [nodes, edges, sourceImage, isPyodideReady]) // eslint-disable-line
+  }, [nodes, edges, sourceImage, proxyImage, isPyodideReady]) // eslint-disable-line
 
   return (
     <div className="editor-panel h-full" style={{ background: "#0d1117" }}>

@@ -1,4 +1,5 @@
 import { create } from "zustand"
+import { getImageDimensions, createProxyImage } from "@/lib/utils/image"
 
 // Dual-matrix architecture per the spec:
 // viewportState = camera (pan/zoom) — never exported
@@ -22,6 +23,13 @@ interface CanvasStore {
   // Source image (original, never mutated)
   sourceImage: string | null
 
+  // Downscaled image for preview (max 800px)
+  proxyImage: string | null
+
+  // Natural dimensions of the original image
+  originalWidth: number
+  originalHeight: number
+
   // Processed image blob URL from Python (after filter ops)
   processedImage: string | null
 
@@ -36,7 +44,7 @@ interface CanvasStore {
   isProcessing: boolean
 
   // Actions
-  setSourceImage: (img: string | null) => void
+  setSourceImage: (img: string | null) => Promise<void>
   setProcessedImage: (img: string | null) => void
   setViewport: (vp: Partial<ViewportState>) => void
   setImageTransform: (tr: Partial<ImageTransformState>) => void
@@ -53,13 +61,50 @@ const defaultImageTransform: ImageTransformState = {
 
 export const useCanvasStore = create<CanvasStore>((set) => ({
   sourceImage: null,
+  proxyImage: null,
+  originalWidth: 0,
+  originalHeight: 0,
   processedImage: null,
   viewport: { ...defaultViewport },
   imageTransform: { ...defaultImageTransform },
   isPyodideReady: false,
   isProcessing: false,
 
-  setSourceImage: (img) => set({ sourceImage: img }),
+  setSourceImage: async (img) => {
+    if (!img) {
+      set({
+        sourceImage: null,
+        proxyImage: null,
+        originalWidth: 0,
+        originalHeight: 0,
+      })
+      return
+    }
+
+    try {
+      // Fetch dimensions and generate proxy image asynchronously
+      const [dimensions, proxy] = await Promise.all([
+        getImageDimensions(img),
+        createProxyImage(img, 800),
+      ])
+
+      set({
+        sourceImage: img,
+        proxyImage: proxy,
+        originalWidth: dimensions.width,
+        originalHeight: dimensions.height,
+      })
+    } catch (e) {
+      console.error("Failed to load source image metadata:", e)
+      // Fallback to setting source image directly without downscaling
+      set({
+        sourceImage: img,
+        proxyImage: img,
+        originalWidth: 0,
+        originalHeight: 0,
+      })
+    }
+  },
   setProcessedImage: (img) => set({ processedImage: img }),
   setViewport: (vp) =>
     set((s) => ({ viewport: { ...s.viewport, ...vp } })),
