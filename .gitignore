@@ -1,0 +1,17 @@
+# Python cache
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Benchmark and testing pictures
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.bmp
+*.tiff
+
+# OS files
+.DS_Store
+Thumbs.db
