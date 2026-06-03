@@ -57,6 +57,12 @@ async function initPyodide(): Promise<PyodideInstance> {
   // Import all modules into the global scope with path configurations and error capturing
   await py.runPythonAsync(`
 import sys
+
+# Clear cached imports to force a fresh reload from the filesystem
+for mod in ["image_io", "intensity", "spatial", "edge_detect", "morphology", "geometry"]:
+    if mod in sys.modules:
+        del sys.modules[mod]
+
 if "/home/pyodide" not in sys.path:
     sys.path.append("/home/pyodide")
 if "/" not in sys.path:
