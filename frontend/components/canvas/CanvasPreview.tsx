@@ -18,6 +18,11 @@ export function CanvasPreview() {
   const setViewport = useCanvasStore((s) => s.setViewport)
   const originalWidth = useCanvasStore((s) => s.originalWidth)
   const originalHeight = useCanvasStore((s) => s.originalHeight)
+  const fitViewportTrigger = useCanvasStore((s) => s.fitViewportTrigger)
+  const [stageSize, setStageSize] = useState({ width: 0, height: 0 })
+
+  const [imageLoadedCount, setImageLoadedCount] = useState(0)
+  const lastAppliedTriggerRef = useRef(-1)
 
   const drawCanvas = useCallback(() => {
     const canvas = canvasRef.current
@@ -27,12 +32,13 @@ export function CanvasPreview() {
     if (!canvas || !ctx) return
     ctx.clearRect(0, 0, canvas.width, canvas.height)
 
+    // Draw checkerboard in unscaled screen coordinates
+    drawCheckerboard(ctx, canvas.width, canvas.height, viewport)
+
     // Viewport camera
     ctx.save()
     ctx.translate(viewport.panX, viewport.panY)
     ctx.scale(viewport.zoom, viewport.zoom)
-
-    drawCheckerboard(ctx, canvas.width, canvas.height, viewport)
 
     if (img && img.complete && img.naturalWidth > 0) {
       ctx.save()
@@ -70,12 +76,13 @@ export function CanvasPreview() {
     const img = new window.Image()
     img.onload = () => {
       masterImageRef.current = img
+      setImageLoadedCount((c) => c + 1)
       drawCanvas()
     }
     img.src = processedImage
   }, [processedImage])
 
-    useEffect(() => {
+  useEffect(() => {
     drawCanvas()
   }, [drawCanvas])
 
@@ -85,15 +92,46 @@ export function CanvasPreview() {
     if (!container || !canvas) return
 
     const observer = new ResizeObserver(() => {
-      canvas.width = container.clientWidth
-      canvas.height = container.clientHeight
+      const w = container.clientWidth
+      const h = container.clientHeight
+      canvas.width = w
+      canvas.height = h
+      setStageSize({ width: w, height: h })
       drawCanvas()
     })
     observer.observe(container)
-    canvas.width = container.clientWidth
-    canvas.height = container.clientHeight
+
+    const w = container.clientWidth
+    const h = container.clientHeight
+    canvas.width = w
+    canvas.height = h
+    setStageSize({ width: w, height: h })
+
     return () => observer.disconnect()
   }, [drawCanvas])
+
+  // Center and fit the image to the panel
+  useEffect(() => {
+    const img = masterImageRef.current
+
+    const displayW = originalWidth > 0 ? originalWidth : (img?.naturalWidth ?? 0)
+    const displayH = originalHeight > 0 ? originalHeight : (img?.naturalHeight ?? 0)
+
+    if (fitViewportTrigger > lastAppliedTriggerRef.current) {
+      if (displayW > 0 && displayH > 0 && stageSize.width > 0 && stageSize.height > 0) {
+        const padding = 40 // nice gap
+        const zoomX = (stageSize.width - padding) / displayW
+        const zoomY = (stageSize.height - padding) / displayH
+        const fitZoom = Math.min(1.0, zoomX, zoomY)
+
+        const panX = (stageSize.width - displayW * fitZoom) / 2
+        const panY = (stageSize.height - displayH * fitZoom) / 2
+
+        setViewport({ zoom: fitZoom, panX, panY })
+        lastAppliedTriggerRef.current = fitViewportTrigger
+      }
+    }
+  }, [fitViewportTrigger, imageLoadedCount, originalWidth, originalHeight, stageSize.width, stageSize.height, setViewport])
 
   // ── Wheel zoom ─────────────────────────────────────────────
   const onWheel = useCallback(
@@ -165,19 +203,25 @@ function drawCheckerboard(
   viewport: { panX: number; panY: number; zoom: number }
 ) {
   const size = 16
-  // The checkerboard is drawn in viewport-local space, so it fills the visible area
-  // Transform back to canvas space
-  const invZoom = 1 / viewport.zoom
-  const startX = Math.floor(-viewport.panX * invZoom / size) * size
-  const startY = Math.floor(-viewport.panY * invZoom / size) * size
-  const endX = startX + (w * invZoom + size * 2)
-  const endY = startY + (h * invZoom + size * 2)
+  // Offset the checkerboard by pan to make it feel like it moves, but keep the size constant
+  // We use modulo to prevent coordinates from growing infinitely
+  const offsetX = viewport.panX % (size * 2)
+  const offsetY = viewport.panY % (size * 2)
+
+  // Start drawing from -size*2 to cover the edges when panning
+  const startX = -size * 2
+  const startY = -size * 2
+  const endX = w + size * 2
+  const endY = h + size * 2
 
   for (let x = startX; x < endX; x += size) {
     for (let y = startY; y < endY; y += size) {
-      const isLight = ((x / size) + (y / size)) % 2 === 0
+      // Calculate true grid coordinate to keep color selection stable during pan offset
+      const gridX = Math.floor((x - offsetX) / size)
+      const gridY = Math.floor((y - offsetY) / size)
+      const isLight = (gridX + gridY) % 2 === 0
       ctx.fillStyle = isLight ? "#1a1d24" : "#141720"
-      ctx.fillRect(x, y, size, size)
+      ctx.fillRect(x + offsetX, y + offsetY, size, size)
     }
   }
 }

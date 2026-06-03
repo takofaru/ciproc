@@ -43,6 +43,8 @@ interface CanvasStore {
   isPyodideReady: boolean
   isProcessing: boolean
 
+  fitViewportTrigger: number
+
   // Actions
   setSourceImage: (img: string | null) => Promise<void>
   setProcessedImage: (img: string | null) => void
@@ -52,6 +54,7 @@ interface CanvasStore {
   setProcessing: (v: boolean) => void
   resetViewport: () => void
   resetImageTransform: () => void
+  triggerFitViewport: () => void
 }
 
 const defaultViewport: ViewportState = { panX: 0, panY: 0, zoom: 1.0 }
@@ -69,6 +72,7 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
   imageTransform: { ...defaultImageTransform },
   isPyodideReady: false,
   isProcessing: false,
+  fitViewportTrigger: 0,
 
   setSourceImage: async (img) => {
     if (!img) {
@@ -93,6 +97,8 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
         proxyImage: proxy,
         originalWidth: dimensions.width,
         originalHeight: dimensions.height,
+        // Also trigger viewport fit when a new source image is successfully loaded
+        fitViewportTrigger: useCanvasStore.getState().fitViewportTrigger + 1
       })
     } catch (e) {
       console.error("Failed to load source image metadata:", e)
@@ -102,6 +108,7 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
         proxyImage: img,
         originalWidth: 0,
         originalHeight: 0,
+        fitViewportTrigger: useCanvasStore.getState().fitViewportTrigger + 1
       })
     }
   },
@@ -112,7 +119,8 @@ export const useCanvasStore = create<CanvasStore>((set) => ({
     set((s) => ({ imageTransform: { ...s.imageTransform, ...tr } })),
   setPyodideReady: (ready) => set({ isPyodideReady: ready }),
   setProcessing: (v) => set({ isProcessing: v }),
-  resetViewport: () => set({ viewport: { ...defaultViewport } }),
+  resetViewport: () => set((s) => ({ fitViewportTrigger: s.fitViewportTrigger + 1 })),
   resetImageTransform: () =>
     set({ imageTransform: { ...defaultImageTransform } }),
+  triggerFitViewport: () => set((s) => ({ fitViewportTrigger: s.fitViewportTrigger + 1 })),
 }))

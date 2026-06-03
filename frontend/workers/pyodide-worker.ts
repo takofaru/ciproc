@@ -1,7 +1,6 @@
 // Pyodide Web Worker — Python image processing engine
 // Runs entirely in a separate thread to keep the UI responsive
 
-let pyodide: unknown = null
 interface PyodideInstance {
     loadPackage: (pkgs: string[]) => Promise<void>
     runPythonAsync: (code: string) => Promise<unknown>
@@ -13,49 +12,52 @@ interface PyodideInstance {
     }
 }
 
+let initPromise: Promise<PyodideInstance> | null = null
+
 // Bootstrap Pyodide + NumPy/Pillow once
 async function initPyodide(): Promise<PyodideInstance> {
-  if (pyodide) return pyodide as PyodideInstance
+  if (initPromise) return initPromise
 
-  // @ts-expect-error – CDN import tidak ada type declaration
-  importScripts("https://cdn.jsdelivr.net/pyodide/v0.27.3/full/pyodide.js")
+  initPromise = (async () => {
+    // @ts-expect-error – CDN import tidak ada type declaration
+    importScripts("https://cdn.jsdelivr.net/pyodide/v0.27.3/full/pyodide.js")
 
-  // @ts-expect-error – loadPyodide ditambahkan oleh importScripts di atas
-  pyodide = await (self as DedicatedWorkerGlobalScope & { loadPyodide: (opts: { indexURL: string }) => Promise<unknown> }).loadPyodide({
-    indexURL: "https://cdn.jsdelivr.net/pyodide/v0.27.3/full/",
-  })
+    // @ts-expect-error – loadPyodide ditambahkan oleh importScripts di atas
+    const py = await (self as DedicatedWorkerGlobalScope & { loadPyodide: (opts: { indexURL: string }) => Promise<unknown> }).loadPyodide({
+      indexURL: "https://cdn.jsdelivr.net/pyodide/v0.27.3/full/",
+    }) as PyodideInstance
 
-  const py = pyodide as PyodideInstance
-  await py.loadPackage(["numpy", "Pillow"])
-  // Define static asset URLs so Webpack/Turbopack can trace and bundle the Python files with content hashes
-  const moduleUrls: Record<string, URL> = {
-    image_io: new URL("./modules/image_io.py", import.meta.url),
-    intensity: new URL("./modules/intensity.py", import.meta.url),
-    spatial: new URL("./modules/spatial.py", import.meta.url),
-    edge_detect: new URL("./modules/edge_detect.py", import.meta.url),
-    morphology: new URL("./modules/morphology.py", import.meta.url),
-    geometry: new URL("./modules/geometry.py", import.meta.url),
-  }
+    await py.loadPackage(["numpy", "Pillow"])
 
-  for (const [name, url] of Object.entries(moduleUrls)) {
-    console.log(`[Pyodide Worker] Fetching ${name} from:`, url.toString())
-    const res = await fetch(url)
-    if (!res.ok) {
-      throw new Error(`Failed to fetch Python module ${name}: ${res.statusText}`)
+    // Define static asset URLs so Webpack/Turbopack can trace and bundle the Python files with content hashes
+    const moduleUrls: Record<string, URL> = {
+      image_io: new URL("./modules/image_io.py", import.meta.url),
+      intensity: new URL("./modules/intensity.py", import.meta.url),
+      spatial: new URL("./modules/spatial.py", import.meta.url),
+      edge_detect: new URL("./modules/edge_detect.py", import.meta.url),
+      morphology: new URL("./modules/morphology.py", import.meta.url),
+      geometry: new URL("./modules/geometry.py", import.meta.url),
     }
-    const code = await res.text()
-    console.log(`[Pyodide Worker] Fetched ${name} (size: ${code.length} bytes). Preview:`, code.slice(0, 120))
-    
-    try {
-      py.FS.writeFile(`/home/pyodide/${name}.py`, code)
-    } catch (e) {
-      // Fallback: write to root directory
-      py.FS.writeFile(`/${name}.py`, code)
-    }
-  }
 
-  // Import all modules into the global scope with path configurations and error capturing
-  await py.runPythonAsync(`
+    for (const [name, url] of Object.entries(moduleUrls)) {
+      console.log(`[Pyodide Worker] Fetching ${name} from:`, url.toString())
+      const res = await fetch(url)
+      if (!res.ok) {
+        throw new Error(`Failed to fetch Python module ${name}: ${res.statusText}`)
+      }
+      const code = await res.text()
+      console.log(`[Pyodide Worker] Fetched ${name} (size: ${code.length} bytes). Preview:`, code.slice(0, 120))
+      
+      try {
+        py.FS.writeFile(`/home/pyodide/${name}.py`, code)
+      } catch (e) {
+        // Fallback: write to root directory
+        py.FS.writeFile(`/${name}.py`, code)
+      }
+    }
+
+    // Import all modules into the global scope with path configurations and error capturing
+    await py.runPythonAsync(`
 import sys
 
 # Clear cached imports to force a fresh reload from the filesystem
@@ -80,9 +82,12 @@ except Exception as e:
     print("Error during import in Pyodide:")
     traceback.print_exc()
     raise e
-  `)
+    `)
 
-  return pyodide as PyodideInstance
+    return py
+  })()
+
+  return initPromise
 }
 
 // Pipeline executor — applies a list of ops in sequence
@@ -99,6 +104,20 @@ async function runPipeline(
   
   const result = await py.runPythonAsync(`
 import json
+import sys
+
+# Ensure paths are set and modules are imported in execution scope
+if "/home/pyodide" not in sys.path:
+    sys.path.append("/home/pyodide")
+if "/" not in sys.path:
+    sys.path.append("/")
+
+from image_io import *
+from intensity import *
+from spatial import *
+from edge_detect import *
+from morphology import *
+from geometry import *
 
 arr = decode_image(_b64_input)
 ops = json.loads(_ops_json)

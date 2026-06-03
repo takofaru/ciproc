@@ -81,7 +81,7 @@ def apply_edge(arr: np.ndarray, method: str = "sobel") -> np.ndarray:
     return np.stack([mag, mag, mag], axis=-1)
 
 def canny_edge_detection(gray: np.ndarray, low_threshold=25, high_threshold=60) -> np.ndarray:
-    """True Canny edge detection in NumPy."""
+    """True Canny edge detection in NumPy (Fully Vectorized)."""
     # 1. Gaussian Blur (radius = 1.0, size = 5)
     size = 5
     pad = 2
@@ -107,58 +107,56 @@ def canny_edge_detection(gray: np.ndarray, low_threshold=25, high_threshold=60) 
     angle = np.arctan2(gy, gx) * 180.0 / np.pi
     angle[angle < 0] += 180.0
     
-    # 3. Non-Maximum Suppression (NMS)
-    h, w_dim = gray.shape
-    nms = np.zeros_like(magnitude)
+    # 3. Vectorized Non-Maximum Suppression (NMS)
+    # Categorize angles into 4 sectors (0, 45, 90, 135 degrees)
+    angle_0 = ((0 <= angle) & (angle < 22.5)) | ((157.5 <= angle) & (angle <= 180))
+    angle_45 = (22.5 <= angle) & (angle < 67.5)
+    angle_90 = (67.5 <= angle) & (angle < 112.5)
+    angle_135 = (112.5 <= angle) & (angle < 157.5)
+    
     mag_pad = np.pad(magnitude, 1, mode='constant', constant_values=0)
     
-    for i in range(1, h + 1):
-        for j in range(1, w_dim + 1):
-            q = 255
-            r = 255
-            ang = angle[i-1, j-1]
-            
-            # Angle 0 degrees (horizontal)
-            if (0 <= ang < 22.5) or (157.5 <= ang <= 180):
-                q = mag_pad[i, j+1]
-                r = mag_pad[i, j-1]
-            # Angle 45 degrees (diagonal)
-            elif (22.5 <= ang < 67.5):
-                q = mag_pad[i+1, j-1]
-                r = mag_pad[i-1, j+1]
-            # Angle 90 degrees (vertical)
-            elif (67.5 <= ang < 112.5):
-                q = mag_pad[i+1, j]
-                r = mag_pad[i-1, j]
-            # Angle 135 degrees (diagonal)
-            elif (112.5 <= ang < 157.5):
-                q = mag_pad[i-1, j-1]
-                r = mag_pad[i+1, j+1]
-                
-            if (mag_pad[i, j] >= q) and (mag_pad[i, j] >= r):
-                nms[i-1, j-1] = mag_pad[i, j]
-            else:
-                nms[i-1, j-1] = 0
-                
+    # Shifted magnitude arrays to get neighbors in all 8 directions
+    mag_E = mag_pad[1:-1, 2:]
+    mag_W = mag_pad[1:-1, :-2]
+    mag_N = mag_pad[:-2, 1:-1]
+    mag_S = mag_pad[2:, 1:-1]
+    mag_NE = mag_pad[:-2, 2:]
+    mag_SW = mag_pad[2:, :-2]
+    mag_NW = mag_pad[:-2, :-2]
+    mag_SE = mag_pad[2:, 2:]
+    
+    q = np.zeros_like(magnitude)
+    r = np.zeros_like(magnitude)
+    
+    # Assign neighbors based on gradient direction
+    q = np.where(angle_0, mag_E, q)
+    r = np.where(angle_0, mag_W, r)
+    
+    q = np.where(angle_45, mag_NE, q)
+    r = np.where(angle_45, mag_SW, r)
+    
+    q = np.where(angle_90, mag_N, q)
+    r = np.where(angle_90, mag_S, r)
+    
+    q = np.where(angle_135, mag_NW, q)
+    r = np.where(angle_135, mag_SE, r)
+    
+    nms = np.where((magnitude >= q) & (magnitude >= r), magnitude, 0.0)
+    
     # 4. Double Thresholding
-    res = np.zeros_like(nms)
-    strong_i, strong_j = np.where(nms >= high_threshold)
-    weak_i, weak_j = np.where((nms >= low_threshold) & (nms < high_threshold))
+    weak = (nms >= low_threshold) & (nms < high_threshold)
+    strong = (nms >= high_threshold)
     
-    res[strong_i, strong_j] = 255
-    res[weak_i, weak_j] = 50
-    
-    # 5. Hysteresis (Edge Tracking)
-    final_res = np.zeros_like(res)
-    h_res, w_res = res.shape
-    for i in range(1, h_res - 1):
-        for j in range(1, w_res - 1):
-            if res[i, j] == 50:
-                # If any of the 8 neighbors is strong (255)
-                neighbors = res[i-1:i+2, j-1:j+2]
-                if np.any(neighbors == 255):
-                    final_res[i, j] = 255
-            elif res[i, j] == 255:
-                final_res[i, j] = 255
-                
-    return final_res
+    # 5. Vectorized Hysteresis Propagation (4 passes for robust local tracing)
+    for _ in range(4):
+        pad_strong = np.pad(strong, 1, mode='constant', constant_values=False)
+        any_strong_neighbor = (
+            pad_strong[:-2, 1:-1] | pad_strong[2:, 1:-1] |
+            pad_strong[1:-1, :-2] | pad_strong[1:-1, 2:] |
+            pad_strong[:-2, :-2] | pad_strong[:-2, 2:] |
+            pad_strong[2:, :-2] | pad_strong[2:, 2:]
+        )
+        strong = strong | (weak & any_strong_neighbor)
+        
+    return np.where(strong, 255.0, 0.0)
