@@ -39,18 +39,34 @@ async function initPyodide(): Promise<PyodideInstance> {
     }
     const code = await res.text()
     
-    // Write code to the virtual filesystem's working directory so modules can import each other
-    py.FS.writeFile(`/home/pyodide/${name}.py`, code)
+    try {
+      py.FS.writeFile(`/home/pyodide/${name}.py`, code)
+    } catch (e) {
+      // Fallback: write to root directory
+      py.FS.writeFile(`/${name}.py`, code)
+    }
   }
 
-  // Import all modules into the global scope
+  // Import all modules into the global scope with path configurations and error capturing
   await py.runPythonAsync(`
-from image_io import *
-from intensity import *
-from spatial import *
-from edge_detect import *
-from morphology import *
-from geometry import *
+import sys
+if "/home/pyodide" not in sys.path:
+    sys.path.append("/home/pyodide")
+if "/" not in sys.path:
+    sys.path.append("/")
+
+try:
+    from image_io import *
+    from intensity import *
+    from spatial import *
+    from edge_detect import *
+    from morphology import *
+    from geometry import *
+except Exception as e:
+    import traceback
+    print("Error during import in Pyodide:")
+    traceback.print_exc()
+    raise e
   `)
 
   return pyodide as PyodideInstance

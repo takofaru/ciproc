@@ -20,14 +20,19 @@ function getWorker(): Worker {
   worker.onmessage = (e) => {
     const { id, type, imageB64, message } = e.data
 
+    const pending = pendingRequests.get(id)
+
     if (type === "init_done") {
       ready = true
+      if (pending) {
+        pendingRequests.delete(id)
+        pending.resolve("")
+      }
       readyListeners.forEach((fn) => fn())
       readyListeners = []
       return
     }
 
-    const pending = pendingRequests.get(id)
     if (!pending) return
     pendingRequests.delete(id)
 
@@ -49,9 +54,15 @@ function waitForReady(): Promise<void> {
 export async function initPyodideWorker(): Promise<void> {
   const w = getWorker()
   if (ready) return
-  const id = generateId()
-  w.postMessage({ id, type: "init", payload: {} })
-  await waitForReady()
+  
+  return new Promise((resolve, reject) => {
+    const id = generateId()
+    pendingRequests.set(id, {
+      resolve: () => resolve(),
+      reject,
+    })
+    w.postMessage({ id, type: "init", payload: {} })
+  })
 }
 
 export async function processImage(
