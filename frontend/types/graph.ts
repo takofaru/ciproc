@@ -13,9 +13,14 @@ export type NodeFilterType =
   | "grayscale"
   | "invert"
   | "sepia"
-  | "blur"
+  | "smooth"
   | "sharpen"
   | "edge"
+  | "histogram_eq"
+  | "channel_split"
+  | "hsl"
+  | "threshold"
+  | "morphology"
   | "output"
 
 export type EditorNodeData = {
@@ -23,6 +28,12 @@ export type EditorNodeData = {
   value?: number
   radius?: number
   strength?: number
+  method?: string
+  channel?: string
+  hue?: number
+  saturation?: number
+  luminance?: number
+  size?: number
 }
 
 export type EditorNode = Node<EditorNodeData>

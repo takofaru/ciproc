@@ -4,7 +4,7 @@ import { processImage } from "@/lib/pyodide/pyodide-client"
 
 export interface Op {
   type: string
-  params: Record<string, number>
+  params: Record<string, number | string>
 }
 
 /**
@@ -30,11 +30,31 @@ export function buildPipeline(nodes: EditorNode[], edges: EditorEdge[]): Op[] {
     const node = nodes.find((n) => n.id === currentId)
     if (!node || node.type === "output") break
 
-    const params: Record<string, number> = {}
-    if (node.type === "brightness") params.value = node.data.value ?? 0
-    if (node.type === "contrast") params.value = node.data.value ?? 1.0
-    if (node.type === "blur") params.radius = node.data.radius ?? 1
-    if (node.type === "sharpen") params.strength = node.data.strength ?? 1.0
+    const params: Record<string, number | string> = {}
+    
+    if (node.type === "brightness") {
+      params.value = node.data.value ?? 0
+    } else if (node.type === "contrast") {
+      params.value = node.data.value ?? 1.0
+    } else if (node.type === "smooth") {
+      params.method = node.data.method ?? "gaussian"
+      params.radius = node.data.radius ?? 1
+    } else if (node.type === "sharpen") {
+      params.strength = node.data.strength ?? 1.0
+    } else if (node.type === "edge") {
+      params.method = node.data.method ?? "sobel"
+    } else if (node.type === "channel_split") {
+      params.channel = node.data.channel ?? "r"
+    } else if (node.type === "hsl") {
+      params.hue = node.data.hue ?? 0
+      params.saturation = node.data.saturation ?? 1.0
+      params.luminance = node.data.luminance ?? 1.0
+    } else if (node.type === "threshold") {
+      params.value = node.data.value ?? 128
+    } else if (node.type === "morphology") {
+      params.method = node.data.method ?? "erosion"
+      params.size = node.data.size ?? 3
+    }
 
     ops.push({ type: node.type!, params })
     currentId = nextMap.get(currentId)
@@ -50,5 +70,5 @@ export async function executePipeline(
   geometryParams?: Record<string, number>
 ): Promise<string> {
   const ops = buildPipeline(nodes, edges)
-  return processImage(sourceImage, ops, geometryParams)
+  return processImage(sourceImage, ops as any, geometryParams)
 }

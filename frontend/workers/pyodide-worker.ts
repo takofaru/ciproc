@@ -6,7 +6,10 @@ interface PyodideInstance {
     loadPackage: (pkgs: string[]) => Promise<void>
     runPythonAsync: (code: string) => Promise<unknown>
     globals: {
-        set: (key: string, value: unknown) =>void
+        set: (key: string, value: unknown) => void
+    }
+    FS: {
+        writeFile: (path: string, data: string, options?: Record<string, any>) => void
     }
 }
 
@@ -25,20 +28,40 @@ async function initPyodide(): Promise<PyodideInstance> {
   const py = pyodide as PyodideInstance
   await py.loadPackage(["numpy", "Pillow"])
 
-  // Python helpers defined once — loaded dynamically from the modules folder
-  const pythonScriptUrl = new URL("./modules/image_processor.py", import.meta.url)
-  const response = await fetch(pythonScriptUrl)
-  if (!response.ok) {
-    throw new Error(`Failed to fetch Python script: ${response.statusText}`)
+  // Python helpers loaded dynamically from the category modules
+  const modules = ["image_io", "intensity", "spatial", "edge_detect", "morphology", "geometry"]
+  
+  for (const name of modules) {
+    const url = new URL(`./modules/${name}.py`, import.meta.url)
+    const res = await fetch(url)
+    if (!res.ok) {
+      throw new Error(`Failed to fetch Python module ${name}: ${res.statusText}`)
+    }
+    const code = await res.text()
+    
+    // Write code to the virtual filesystem's working directory so modules can import each other
+    py.FS.writeFile(`/home/pyodide/${name}.py`, code)
   }
-  const pythonCode = await response.text()
-  await py.runPythonAsync(pythonCode)
+
+  // Import all modules into the global scope
+  await py.runPythonAsync(`
+from image_io import *
+from intensity import *
+from spatial import *
+from edge_detect import *
+from morphology import *
+from geometry import *
+  `)
 
   return pyodide as PyodideInstance
 }
 
 // Pipeline executor — applies a list of ops in sequence
-async function runPipeline(imageB64: string, ops: Array<{type: string, params: Record<string, number>}>, geometryParams?: Record<string, number>): Promise<string> {
+async function runPipeline(
+  imageB64: string, 
+  ops: Array<{type: string, params: Record<string, number | string>}>, 
+  geometryParams?: Record<string, number>
+): Promise<string> {
   const py = await initPyodide()
   
   py.globals.set("_b64_input", imageB64)
@@ -66,12 +89,22 @@ for op in ops:
         arr = apply_invert(arr)
     elif t == "sepia":
         arr = apply_sepia(arr)
-    elif t == "blur":
-        arr = apply_blur(arr, int(p.get("radius", 1)))
+    elif t == "smooth":
+        arr = apply_smooth(arr, p.get("method", "gaussian"), int(p.get("radius", 1)))
     elif t == "sharpen":
         arr = apply_sharpen(arr, p.get("strength", 1.0))
     elif t == "edge":
-        arr = apply_edge(arr)
+        arr = apply_edge(arr, p.get("method", "sobel"))
+    elif t == "histogram_eq":
+        arr = apply_histogram_eq(arr)
+    elif t == "channel_split":
+        arr = apply_channel_split(arr, p.get("channel", "r"))
+    elif t == "hsl":
+        arr = apply_hsl(arr, p.get("hue", 0), p.get("saturation", 1.0), p.get("luminance", 1.0))
+    elif t == "threshold":
+        arr = apply_threshold(arr, p.get("value", 128))
+    elif t == "morphology":
+        arr = apply_morphology(arr, p.get("method", "erosion"), int(p.get("size", 3)))
 
 # Apply geometry only on export
 if geo:
