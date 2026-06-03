@@ -1,0 +1,29 @@
+brightness
+	output = input + S
+	S		: 0 - 255
+contrast
+	manual	: (v - 128) * C + 128
+histogram eq
+rgb to gray
+channel splitting (r, g, b)
+hue, saturation, luminance adjustment
+smooth/blur/denoising (proses semua channel)
+	Median
+	Max
+	Min
+	Mean
+	Gaussian
+sharp
+	Unsharp Masking (sharp = orginal - smooth)
+edge
+	Canny 
+    Sobel 
+    Prewitt
+    Robert
+    Laplacian
+    Laplacian of gaussian
+binary color
+	thresholding
+morphology
+	erosion
+	dilation
