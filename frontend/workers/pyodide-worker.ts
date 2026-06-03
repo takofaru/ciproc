@@ -27,17 +27,24 @@ async function initPyodide(): Promise<PyodideInstance> {
 
   const py = pyodide as PyodideInstance
   await py.loadPackage(["numpy", "Pillow"])
+  // Define static asset URLs so Webpack/Turbopack can trace and bundle the Python files with content hashes
+  const moduleUrls: Record<string, URL> = {
+    image_io: new URL("./modules/image_io.py", import.meta.url),
+    intensity: new URL("./modules/intensity.py", import.meta.url),
+    spatial: new URL("./modules/spatial.py", import.meta.url),
+    edge_detect: new URL("./modules/edge_detect.py", import.meta.url),
+    morphology: new URL("./modules/morphology.py", import.meta.url),
+    geometry: new URL("./modules/geometry.py", import.meta.url),
+  }
 
-  // Python helpers loaded dynamically from the category modules
-  const modules = ["image_io", "intensity", "spatial", "edge_detect", "morphology", "geometry"]
-  
-  for (const name of modules) {
-    const url = new URL(`./modules/${name}.py`, import.meta.url)
+  for (const [name, url] of Object.entries(moduleUrls)) {
+    console.log(`[Pyodide Worker] Fetching ${name} from:`, url.toString())
     const res = await fetch(url)
     if (!res.ok) {
       throw new Error(`Failed to fetch Python module ${name}: ${res.statusText}`)
     }
     const code = await res.text()
+    console.log(`[Pyodide Worker] Fetched ${name} (size: ${code.length} bytes). Preview:`, code.slice(0, 120))
     
     try {
       py.FS.writeFile(`/home/pyodide/${name}.py`, code)
