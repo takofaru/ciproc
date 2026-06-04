@@ -8,7 +8,7 @@ interface PyodideInstance {
         set: (key: string, value: unknown) => void
     }
     FS: {
-        writeFile: (path: string, data: string, options?: Record<string, any>) => void
+        writeFile: (path: string, data: string, options?: Record<string, unknown>) => void
     }
 }
 
@@ -164,6 +164,39 @@ encode_image(arr)
   return result
 }
 
+
+// Histogram compute — returns JSON {r, g, b, gray} each 256-element arrays
+async function runHistogram(imageB64: string): Promise<string> {
+  const py = await initPyodide()
+  py.globals.set("_hist_b64", imageB64)
+  const result = await py.runPythonAsync(`
+import json
+import sys
+if "/home/pyodide" not in sys.path:
+    sys.path.append("/home/pyodide")
+if "/" not in sys.path:
+    sys.path.append("/")
+from image_io import decode_image
+import numpy as np
+
+arr = decode_image(_hist_b64)
+clipped = np.clip(arr, 0, 255).astype(np.uint8)
+
+def hist(ch):
+    counts, _ = np.histogram(ch.flatten(), bins=256, range=(0,255))
+    return counts.tolist()
+
+r_hist = hist(clipped[:,:,0])
+g_hist = hist(clipped[:,:,1])
+b_hist = hist(clipped[:,:,2])
+gray   = (0.299*clipped[:,:,0] + 0.587*clipped[:,:,1] + 0.114*clipped[:,:,2]).astype(np.uint8)
+gray_hist = hist(gray)
+
+json.dumps({"r": r_hist, "g": g_hist, "b": b_hist, "gray": gray_hist})
+  `) as string
+  return result
+}
+
 self.addEventListener("message", async (e) => {
   const { id, type, payload } = e.data
 
@@ -178,6 +211,13 @@ self.addEventListener("message", async (e) => {
       const { imageB64, ops, geometryParams } = payload
       const result = await runPipeline(imageB64, ops, geometryParams)
       self.postMessage({ id, type: "result", imageB64: result })
+      return
+    }
+
+    if (type === "histogram") {
+      const { imageB64 } = payload
+      const result = await runHistogram(imageB64)
+      self.postMessage({ id, type: "histogram_result", data: result })
       return
     }
 

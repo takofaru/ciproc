@@ -38,6 +38,8 @@ function getWorker(): Worker {
 
     if (type === "error") {
       pending.reject(new Error(message))
+    } else if (type === "histogram_result") {
+      pending.resolve(e.data.data)
     } else {
       pending.resolve(imageB64)
     }
@@ -81,5 +83,21 @@ export async function processImage(
       type: "process",
       payload: { imageB64, ops, geometryParams },
     })
+  })
+}
+
+// ── Histogram request ─────────────────────────────────────────
+export async function computeHistogram(imageB64: string): Promise<{
+  r: number[]; g: number[]; b: number[]; gray: number[]
+}> {
+  const w = getWorker()
+  await waitForReady()
+  return new Promise((resolve, reject) => {
+    const id = generateId()
+    pendingRequests.set(id, {
+      resolve: (v: string) => resolve(JSON.parse(v)),
+      reject,
+    })
+    w.postMessage({ id, type: "histogram", payload: { imageB64 } })
   })
 }
