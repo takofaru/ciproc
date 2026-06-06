@@ -30,6 +30,11 @@ export function buildPipeline(nodes: EditorNode[], edges: EditorEdge[]): Op[] {
     const node = nodes.find((n) => n.id === currentId)
     if (!node || node.type === "output") break
 
+    if (node.data?.disabled) {
+      currentId = nextMap.get(currentId)
+      continue
+    }
+
     const params: Record<string, number | string> = {}
     
     if (node.type === "brightness") {

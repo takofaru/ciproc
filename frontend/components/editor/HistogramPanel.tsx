@@ -118,34 +118,88 @@ export function HistogramPanel() {
   const processedImage = useCanvasStore((s) => s.processedImage)
   const isPyodideReady = useCanvasStore((s) => s.isPyodideReady)
 
+  const proxyImage = useCanvasStore((s) => s.proxyImage)
+  const activeInputImage = proxyImage || sourceImage
+
   const [beforeData, setBeforeData] = useState<HistData | null>(null)
   const [afterData,  setAfterData]  = useState<HistData | null>(null)
   const [mode,       setMode]       = useState<Mode>("rgb")
-  const [loading,    setLoading]    = useState(false)
+  const [loadingBefore, setLoadingBefore] = useState(false)
+  const [loadingAfter, setLoadingAfter] = useState(false)
 
-  const compute = useCallback(async () => {
-    if (!sourceImage || !isPyodideReady) return
-    setLoading(true)
-    try {
-      const [before, after] = await Promise.all([
-        computeHistogram(sourceImage),
-        processedImage && processedImage !== sourceImage
-          ? computeHistogram(processedImage)
-          : Promise.resolve(null),
-      ])
-      setBeforeData(before)
-      setAfterData(after ?? before)
-    } finally {
-      setLoading(false)
-    }
-  }, [sourceImage, processedImage, isPyodideReady])
-
-  // Auto-compute when processed image changes
+  // Compute before histogram once when active input image changes
   useEffect(() => {
-    if (sourceImage && isPyodideReady) return
-    const timer = setTimeout(() => { compute() }, 100)
-    return () => clearTimeout(timer)
-  }, [processedImage, isPyodideReady]) // eslint-disable-line
+    if (!activeInputImage || !isPyodideReady) {
+      setBeforeData(null)
+      return
+    }
+
+    let isMounted = true
+    setLoadingBefore(true)
+    computeHistogram(activeInputImage)
+      .then((data) => {
+        if (isMounted) {
+          setBeforeData(data)
+        }
+      })
+      .catch(console.error)
+      .finally(() => {
+        if (isMounted) setLoadingBefore(false)
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [activeInputImage, isPyodideReady])
+
+  // Compute after histogram when processedImage changes
+  useEffect(() => {
+    if (!isPyodideReady) {
+      setAfterData(null)
+      return
+    }
+
+    if (!processedImage) {
+      setAfterData(beforeData)
+      return
+    }
+
+    let isMounted = true
+    setLoadingAfter(true)
+    computeHistogram(processedImage)
+      .then((data) => {
+        if (isMounted) {
+          setAfterData(data)
+        }
+      })
+      .catch(console.error)
+      .finally(() => {
+        if (isMounted) setLoadingAfter(false)
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [processedImage, beforeData, isPyodideReady])
+
+  const refresh = useCallback(async () => {
+    if (!activeInputImage || !isPyodideReady) return
+    setLoadingBefore(true)
+    setLoadingAfter(true)
+    try {
+      const before = await computeHistogram(activeInputImage)
+      setBeforeData(before)
+      const after = processedImage ? await computeHistogram(processedImage) : before
+      setAfterData(after)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoadingBefore(false)
+      setLoadingAfter(false)
+    }
+  }, [activeInputImage, processedImage, isPyodideReady])
+
+  const loading = loadingBefore || loadingAfter
 
   const activeChannels: Channel[] =
     mode === "gray" ? ["gray"] :
@@ -194,7 +248,7 @@ export function HistogramPanel() {
             <HistCanvas data={afterData} channels={["gray"]} height={64} />
           </div>
           <button
-            onClick={compute}
+            onClick={refresh}
             className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors text-center"
           >
             ↺ Refresh
@@ -226,7 +280,7 @@ export function HistogramPanel() {
           )}
 
           <button
-            onClick={compute}
+            onClick={refresh}
             className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors text-center"
           >
             ↺ Refresh

@@ -8,6 +8,8 @@ import { useGraphStore } from "@/stores/graph-store"
 import { projectApi } from "@/lib/api"
 import { executePipeline } from "@/lib/graph/pipeline-executor"
 import { nanoid } from "nanoid"
+import { ExportModal } from "./ExportModal"
+import { CipViewerModal } from "./CipViewerModal"
 
 // ── Types ────────────────────────────────────────────────────
 type MenuItemDef =
@@ -58,6 +60,8 @@ function MenuDropdown({
 export function MenuBar() {
   const router = useRouter()
   const [openMenu, setOpenMenu] = useState<string | null>(null)
+  const [isExportOpen, setIsExportOpen] = useState(false)
+  const [isImportOpen, setIsImportOpen] = useState(false)
   const INPUT_ID = "menu-file-input"
 
   const activeProject = useProjectStore((s) => s.activeProject)
@@ -169,6 +173,26 @@ export function MenuBar() {
     [nodes, setNodes]
   )
 
+  const disableAllEffects = useCallback(() => {
+    const updatedNodes = nodes.map((n) => {
+      if (n.type === "imageInput" || n.type === "output") {
+        return n
+      }
+      return { ...n, data: { ...n.data, disabled: true } }
+    })
+    setNodes(updatedNodes)
+  }, [nodes, setNodes])
+
+  const enableAllEffects = useCallback(() => {
+    const updatedNodes = nodes.map((n) => {
+      if (n.type === "imageInput" || n.type === "output") {
+        return n
+      }
+      return { ...n, data: { ...n.data, disabled: false } }
+    })
+    setNodes(updatedNodes)
+  }, [nodes, setNodes])
+
   // ── Menu definitions — computed OUTSIDE JSX via useMemo equivalent ──
   // Semua item hanya menyimpan referensi fungsi, tidak mengakses ref.current
   const menus: MenuDef[] = [
@@ -178,7 +202,9 @@ export function MenuBar() {
         { label: "Save",             shortcut: "⌘S", action: saveProject,  disabled: !activeProject },
         { separator: true },
         { label: "Import Image…",    shortcut: "⌘O", action: importImage },
-        { label: "Export as JPG",    shortcut: "⌘E", action: exportImage,  disabled: !processedImage },
+        { label: "Import Custom (.cip) File…", action: () => setIsImportOpen(true) },
+        { separator: true },
+        { label: "Export Image…",    shortcut: "⌘E", action: () => setIsExportOpen(true),  disabled: !processedImage },
         { separator: true },
         { label: "Back to Projects",                  action: () => router.push("/") },
       ],
@@ -187,6 +213,9 @@ export function MenuBar() {
       label: "Edit",
       items: [
         { label: "Reset Node Graph", action: resetGraph },
+        { separator: true },
+        { label: "Disable All Effects", action: disableAllEffects, disabled: !sourceImage },
+        { label: "Enable All Effects",  action: enableAllEffects,  disabled: !sourceImage },
         { separator: true },
         { label: "Reset Transform",  action: resetImageTransform },
         { label: "Reset Viewport",   action: resetViewport },
@@ -296,6 +325,18 @@ export function MenuBar() {
         accept="image/*"
         className="hidden"
         onChange={handleFileChange}
+      />
+
+      <ExportModal
+        isOpen={isExportOpen}
+        onClose={() => setIsExportOpen(false)}
+        processedImage={processedImage}
+        imageInputName={activeProject?.name ?? "export"}
+      />
+
+      <CipViewerModal
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
       />
     </div>
   )

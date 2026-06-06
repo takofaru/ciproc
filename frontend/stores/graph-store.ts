@@ -33,8 +33,37 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
   onEdgesChange: (changes) =>
     set({ edges: applyEdgeChanges(changes, get().edges) }),
 
-  onConnect: (connection) =>
-    set({ edges: addEdge(connection, get().edges) }),
+  onConnect: (connection) => {
+    const { source, target, sourceHandle, targetHandle } = connection
+    if (!source || !target) return
+
+    const existingEdges = get().edges
+    const exactMatch = existingEdges.find(
+      (e) =>
+        e.source === source &&
+        e.target === target &&
+        e.sourceHandle === sourceHandle &&
+        e.targetHandle === targetHandle
+    )
+
+    if (exactMatch) {
+      // Toggle delete: remove the existing edge
+      set({
+        edges: existingEdges.filter((e) => e.id !== exactMatch.id),
+      })
+    } else {
+      // 1-to-1 rule: remove any edges connected to the same target handle OR the same source handle
+      const filteredEdges = existingEdges.filter(
+        (e) =>
+          !(e.source === source && e.sourceHandle === sourceHandle) &&
+          !(e.target === target && e.targetHandle === targetHandle)
+      )
+      // Add the new edge
+      set({
+        edges: addEdge(connection, filteredEdges),
+      })
+    }
+  },
 
   updateNodeData: (id, data) =>
     set({

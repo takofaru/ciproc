@@ -6,6 +6,8 @@ import { NewProjectModal } from "@/components/dashboard/NewProjectModal"
 import { projectApi } from "@/lib/api"
 import { useProjectStore } from "@/stores/project-store"
 
+import Link from "next/link"
+
 export default function Dashboard() {
   const { projects, setProjects, isLoading, setLoading, error, setError } = useProjectStore()
   const [showNew, setShowNew] = useState(false)
@@ -51,12 +53,14 @@ export default function Dashboard() {
             </svg>
             All Projects
           </button>
-          <button className="dashboard-nav-item">
-            <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-              <path d="M7.5 1.5v12M1.5 7.5h12" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+          <Link href="/cip-viewer" className="dashboard-nav-item">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-[15px] h-[15px]">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+              <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+              <line x1="12" y1="22.08" x2="12" y2="12" />
             </svg>
-            New Project
-          </button>
+            CIP File Viewer
+          </Link>
         </nav>
 
         <div className="mt-auto p-4 border-t border-zinc-800">

@@ -34,6 +34,7 @@ export type EditorNodeData = {
   saturation?: number
   luminance?: number
   size?: number
+  disabled?: boolean
 }
 
 export type EditorNode = Node<EditorNodeData>
