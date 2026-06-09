@@ -58,6 +58,11 @@ function MenuDropdown({
 
 // ── MenuBar ──────────────────────────────────────────────────
 export function MenuBar() {
+  const undo = useGraphStore((s) => s.undo)
+  const redo = useGraphStore((s) => s.redo)
+  const canUndo = useGraphStore((s) => s.history.length > 0)
+  const canRedo = useGraphStore((s) => s.future.length > 0)
+
   const router = useRouter()
   const [openMenu, setOpenMenu] = useState<string | null>(null)
   const [isExportOpen, setIsExportOpen] = useState(false)
@@ -162,15 +167,17 @@ export function MenuBar() {
     ])
   }, [setNodes, setEdges])
 
+  const snapshot = useGraphStore((s) => s.snapshot)
   const addNode = useCallback(
     (type: string) => {
+      snapshot()
       const offset = (nodes.length % 6) * 40
       setNodes([
         ...nodes,
         { id: nanoid(), type, position: { x: 200 + offset, y: 100 + offset }, data: {} },
       ])
     },
-    [nodes, setNodes]
+    [nodes, setNodes, snapshot]
   )
 
   const disableAllEffects = useCallback(() => {
@@ -199,12 +206,12 @@ export function MenuBar() {
     {
       label: "File",
       items: [
-        { label: "Save",             shortcut: "⌘S", action: saveProject,  disabled: !activeProject },
+        { label: "Save",             shortcut: "ctrl + S", action: saveProject,  disabled: !activeProject },
         { separator: true },
-        { label: "Import Image…",    shortcut: "⌘O", action: importImage },
+        { label: "Import Image…",    shortcut: "ctrl + O", action: importImage },
         { label: "Import Custom (.cip) File…", action: () => setIsImportOpen(true) },
         { separator: true },
-        { label: "Export Image…",    shortcut: "⌘E", action: () => setIsExportOpen(true),  disabled: !processedImage },
+        { label: "Export Image…",    shortcut: "ctrl + E", action: () => setIsExportOpen(true),  disabled: !processedImage },
         { separator: true },
         { label: "Back to Projects",                  action: () => router.push("/") },
       ],
@@ -212,6 +219,9 @@ export function MenuBar() {
     {
       label: "Edit",
       items: [
+        { label: "Undo", shortcut: "ctrl + z", action: undo, disabled: !canUndo },
+        { label: "Redo", shortcut: "ctrl + y", action: redo, disabled: !canRedo },
+        { separator: true },
         { label: "Reset Node Graph", action: resetGraph },
         { separator: true },
         { label: "Disable All Effects", action: disableAllEffects, disabled: !sourceImage },
@@ -268,7 +278,7 @@ export function MenuBar() {
       {/* Logo */}
       <div className="menu-logo">
         <div className="w-6 h-6 rounded bg-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-          PS
+          CIP
         </div>
       </div>
 

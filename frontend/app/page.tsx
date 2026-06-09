@@ -38,7 +38,7 @@ export default function Dashboard() {
       <aside className="dashboard-sidebar">
         <div className="flex items-center gap-2 px-5 py-5 border-b border-zinc-800">
           <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-            PS
+            CIP
           </div>
           <div>
             <p className="text-sm font-semibold leading-none">Mini Photoshop</p>

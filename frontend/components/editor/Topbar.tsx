@@ -53,7 +53,7 @@ export function TopBar() {
         <div className="flex items-center gap-2">
           {/* Logo mark */}
           <div className="w-7 h-7 rounded-md bg-blue-500 flex items-center justify-center text-white text-xs font-bold">
-            PS
+            CIP
           </div>
           <h1 className="font-semibold text-sm">Mini Photoshop</h1>
         </div>

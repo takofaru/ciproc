@@ -12,17 +12,27 @@ interface GraphStore {
   nodes: EditorNode[]
   edges: EditorEdge[]
 
-  setNodes: (nodes: EditorNode[]) => void
-  setEdges: (edges: EditorEdge[]) => void
+  history: Array<{ nodes: EditorNode[]; edges: EditorEdge[] }>
+  future:  Array<{ nodes: EditorNode[]; edges: EditorEdge[] }>
+
   onNodesChange: (changes: EditorNodeChange[]) => void
   onEdgesChange: (changes: EditorEdgeChange[]) => void
   onConnect: (connection: EditorConnection) => void
+
+  setNodes: (nodes: EditorNode[]) => void
+  setEdges: (edges: EditorEdge[]) => void
   updateNodeData: (id: string, data: Partial<EditorNode["data"]>) => void
+
+  snapshot: () => void
+  undo: () => void
+  redo: () => void
 }
 
 export const useGraphStore = create<GraphStore>((set, get) => ({
   nodes: [],
   edges: [],
+  history: [],
+  future: [],
 
   setNodes: (nodes) => set({ nodes }),
   setEdges: (edges) => set({ edges }),
@@ -65,10 +75,43 @@ export const useGraphStore = create<GraphStore>((set, get) => ({
     }
   },
 
+  snapshot: () => {
+    const { nodes, edges, history } = get()
+    set({
+      history: [...history.slice(-49), { nodes, edges }], //max 49step
+      future: [],
+    })
+  },
+
+  undo: () => {
+    const { history, future, nodes, edges } = get()
+    if (!history.length) return
+    const prev = history[history.length - 1]
+    set({
+      nodes: prev.nodes,
+      edges: prev.edges,
+      history: history.slice(0, -1),
+      future: [{ nodes, edges}, ...future],
+    })
+  },
+
+  redo: ()=> {
+    const { history, future, nodes, edges } = get()
+    if (!future.length) return
+    const next = future[0]
+    set({
+      nodes: next.nodes,
+      edges: next.edges,
+      history: [...history, { nodes, edges }],
+      future: future.slice(1),
+    })
+  },
+
   updateNodeData: (id, data) =>
     set({
       nodes: get().nodes.map((n) =>
         n.id === id ? { ...n, data: { ...n.data, ...data } } : n
       ),
     }),
+    
 }))

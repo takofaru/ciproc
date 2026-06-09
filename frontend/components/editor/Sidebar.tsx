@@ -10,8 +10,10 @@ const groups = ["Source", "Adjust", "Color", "Convolve", "Sink"]
 export function Sidebar() {
   const nodes = useGraphStore((s) => s.nodes)
   const setNodes = useGraphStore((s) => s.setNodes)
+  const snapshot = useGraphStore((s) => s.snapshot)
 
   const addNode = useCallback((type: string) => {
+    snapshot()
     const offset = (nodes.length % 6) * 40
     setNodes([
       ...nodes,
@@ -22,7 +24,7 @@ export function Sidebar() {
         data: {},
       },
     ])
-  }, [nodes, setNodes])
+  }, [nodes, setNodes, snapshot])
 
   return (
     <aside className="editor-panel overflow-auto">
