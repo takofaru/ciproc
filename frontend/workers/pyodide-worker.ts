@@ -37,6 +37,7 @@ async function initPyodide(): Promise<PyodideInstance> {
       edge_detect: new URL("./modules/edge_detect.py", import.meta.url),
       morphology: new URL("./modules/morphology.py", import.meta.url),
       geometry: new URL("./modules/geometry.py", import.meta.url),
+      compression: new URL("./modules/compression.py", import.meta.url),
     }
 
     for (const [name, url] of Object.entries(moduleUrls)) {
@@ -61,7 +62,7 @@ async function initPyodide(): Promise<PyodideInstance> {
 import sys
 
 # Clear cached imports to force a fresh reload from the filesystem
-for mod in ["image_io", "intensity", "spatial", "edge_detect", "morphology", "geometry"]:
+for mod in ["image_io", "intensity", "spatial", "edge_detect", "morphology", "geometry", "compression"]:
     if mod in sys.modules:
         del sys.modules[mod]
 
@@ -77,6 +78,7 @@ try:
     from edge_detect import *
     from morphology import *
     from geometry import *
+    from compression import *
 except Exception as e:
     import traceback
     print("Error during import in Pyodide:")
@@ -225,9 +227,83 @@ self.addEventListener("message", async (e) => {
       return
     }
 
+    if (type === "compress") {
+      const { imageB64, quality, method } = payload
+      try {
+        const result = await runCompress(imageB64, quality, method || "max")
+        self.postMessage({ id, type: "compress_result", data: result })
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err)
+        self.postMessage({ id, type: "error", message })
+      }
+      return
+    }
+
+    if (type === "decompress") {
+      const { data } = payload
+      try {
+        const result = await runDecompress(data)
+        self.postMessage({ id, type: "decompress_result", imageB64: result })
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err)
+        self.postMessage({ id, type: "error", message })
+      }
+      return
+    }
+
     self.postMessage({ id, type: "error", message: `Unknown type: ${type}` })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err)
     self.postMessage({ id, type: "error", message })
   }
 })
+
+async function runCompress(imageB64: string, quality: number, method: string): Promise<string> {
+  const py = await initPyodide()
+  py.globals.set("_img_b64", imageB64)
+  py.globals.set("_quality", quality)
+  py.globals.set("_method", method)
+  const result = await py.runPythonAsync(`
+import sys
+if "/home/pyodide" not in sys.path:
+    sys.path.append("/home/pyodide")
+if "/" not in sys.path:
+    sys.path.append("/")
+from image_io import decode_image
+from compression import compress_image
+import base64
+import json
+
+arr = decode_image(_img_b64)
+pixels = arr.astype(np.uint8).tobytes()
+width, height = arr.shape[1], arr.shape[0]
+compressed = compress_image(pixels, width, height, _quality, _method)
+
+# Return base64 encoded compressed data
+b64_compressed = base64.b64encode(compressed).decode()
+json.dumps({"data": b64_compressed, "originalSize": len(pixels), "compressedSize": len(compressed)})
+  `) as string
+  return result
+}
+
+async function runDecompress(data: string): Promise<string> {
+  const py = await initPyodide()
+  py.globals.set("_data", data)
+  const result = await py.runPythonAsync(`
+import sys
+import base64
+if "/home/pyodide" not in sys.path:
+    sys.path.append("/home/pyodide")
+if "/" not in sys.path:
+    sys.path.append("/")
+from image_io import encode_image
+from compression import decompress
+import numpy as np
+
+compressed = base64.b64decode(_data)
+pixels, width, height = decompress(compressed)
+arr = np.frombuffer(pixels, dtype=np.uint8).reshape((height, width, 3))
+encode_image(arr)
+  `) as string
+  return result
+}

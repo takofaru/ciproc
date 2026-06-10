@@ -1,7 +1,11 @@
 // Pyodide client — manages worker lifecycle and promise-based messaging
 
 let worker: Worker | null = null
-const pendingRequests = new Map<string, { resolve: (v: string) => void; reject: (e: unknown) => void }>()
+interface PendingRequest {
+  resolve: (v: any) => void
+  reject: (e: unknown) => void
+}
+const pendingRequests = new Map<string, PendingRequest>()
 let ready = false
 let readyListeners: (() => void)[] = []
 
@@ -18,7 +22,7 @@ function getWorker(): Worker {
   )
 
   worker.onmessage = (e) => {
-    const { id, type, imageB64, message } = e.data
+    const { id, type, imageB64, message, data } = e.data
 
     const pending = pendingRequests.get(id)
 
@@ -39,7 +43,11 @@ function getWorker(): Worker {
     if (type === "error") {
       pending.reject(new Error(message))
     } else if (type === "histogram_result") {
-      pending.resolve(e.data.data)
+      pending.resolve(JSON.parse(data))
+    } else if (type === "compress_result") {
+      pending.resolve(JSON.parse(data))
+    } else if (type === "decompress_result") {
+      pending.resolve(imageB64)
     } else {
       pending.resolve(imageB64)
     }
@@ -86,7 +94,6 @@ export async function processImage(
   })
 }
 
-// ── Histogram request ─────────────────────────────────────────
 export async function computeHistogram(imageB64: string): Promise<{
   r: number[]; g: number[]; b: number[]; gray: number[]
 }> {
@@ -95,9 +102,41 @@ export async function computeHistogram(imageB64: string): Promise<{
   return new Promise((resolve, reject) => {
     const id = generateId()
     pendingRequests.set(id, {
-      resolve: (v: string) => resolve(JSON.parse(v)),
+      resolve: (v: { r: number[]; g: number[]; b: number[]; gray: number[] }) => resolve(v),
       reject,
     })
     w.postMessage({ id, type: "histogram", payload: { imageB64 } })
+  })
+}
+
+export async function compressImage(
+  imageB64: string,
+  quality: number,
+  method: string = "max"
+): Promise<{ data: string; originalSize: number; compressedSize: number }> {
+  const w = getWorker()
+  await waitForReady()
+  return new Promise((resolve, reject) => {
+    const id = generateId()
+    pendingRequests.set(id, { resolve, reject })
+    w.postMessage({
+      id,
+      type: "compress",
+      payload: { imageB64, quality, method },
+    })
+  })
+}
+
+export async function decompressImage(data: string): Promise<string> {
+  const w = getWorker()
+  await waitForReady()
+  return new Promise((resolve, reject) => {
+    const id = generateId()
+    pendingRequests.set(id, { resolve, reject })
+    w.postMessage({
+      id,
+      type: "decompress",
+      payload: { data },
+    })
   })
 }
