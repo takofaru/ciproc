@@ -19,3 +19,5 @@ uploads/
   {project_id}/
     project.json   — metadata + node graph
     source.jpg     — original uploaded image
+
+<!-- tensorflow library requires python 3.11 so, harus downgrade -->
