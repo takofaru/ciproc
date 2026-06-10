@@ -7,38 +7,28 @@ METHOD_FAST = "fast"      # LZW + Huffman (Standard, Fast)
 METHOD_MAX = "max"        # LZW + Arithmetic (Max ratio, Slower)
 
 # ── Color Quantization (Median Cut) ─────────────────────────────────
-def quantize(pixels: np.ndarray, K: int, width: int = 0, height: int = 0) -> tuple[np.ndarray, np.ndarray]:
-    """Color quantization using Median Cut algorithm with Bayer Dithering."""
+def quantize(pixels: np.ndarray, K: int) -> tuple[np.ndarray, np.ndarray]:
+    """Color quantization using Median Cut algorithm."""
     bins = {}
     for i in range(0, len(pixels), 3):
         r, g, b = int(pixels[i]), int(pixels[i+1]), int(pixels[i+2])
         bin_id = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4)
         if bin_id not in bins:
-            bins[bin_id] = {'r_sum': 0, 'g_sum': 0, 'b_sum': 0, 'count': 0, 'r': r, 'g': g, 'b': b, 'bin_id': bin_id}
+            bins[bin_id] = {'r_sum': 0, 'g_sum': 0, 'b_sum': 0, 'count': 0}
         bins[bin_id]['r_sum'] += r
         bins[bin_id]['g_sum'] += g
         bins[bin_id]['b_sum'] += b
         bins[bin_id]['count'] += 1
-        # Update mean dynamically for variance calc
-        bins[bin_id]['r'] = bins[bin_id]['r_sum'] // bins[bin_id]['count']
-        bins[bin_id]['g'] = bins[bin_id]['g_sum'] // bins[bin_id]['count']
-        bins[bin_id]['b'] = bins[bin_id]['b_sum'] // bins[bin_id]['count']
 
-    items = list(bins.values())
-    if len(items) <= K:
-        palette = []
-        bin_to_idx = {}
-        for i, item in enumerate(items):
-            palette.append((item['r'], item['g'], item['b']))
-            bin_to_idx[item['bin_id']] = i
-        
-        num_pixels = len(pixels) // 3
-        indices = np.zeros(num_pixels, dtype=np.uint8)
-        for i in range(0, len(pixels), 3):
-            r, g, b = int(pixels[i]), int(pixels[i+1]), int(pixels[i+2])
-            bin_id = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4)
-            indices[i // 3] = bin_to_idx[bin_id]
-        return np.array(palette, dtype=np.uint8), indices
+    items = []
+    for bin_id, data in bins.items():
+        items.append({
+            'r': data['r_sum'] / data['count'],
+            'g': data['g_sum'] / data['count'],
+            'b': data['b_sum'] / data['count'],
+            'count': data['count'],
+            'bin_id': bin_id
+        })
 
     class Box:
         def __init__(self, items):
@@ -116,30 +106,8 @@ def quantize(pixels: np.ndarray, K: int, width: int = 0, height: int = 0) -> tup
 
     num_pixels = len(pixels) // 3
     indices = np.zeros(num_pixels, dtype=np.uint8)
-    
-    # Pre-compute Bayer matrix if width and height are provided
-    if width > 0 and height > 0:
-        bayer = np.array([
-            [ 0,  8,  2, 10],
-            [12,  4, 14,  6],
-            [ 3, 11,  1,  9],
-            [15,  7, 13,  5]
-        ], dtype=np.float32) / 16.0 - 0.5
-        bayer *= 16  # Noise strength
-        bayer_tiled = np.tile(bayer, (height // 4 + 1, width // 4 + 1))[:height, :width]
-        bayer_flat = bayer_tiled.flatten()
-    else:
-        bayer_flat = None
-
     for i in range(0, len(pixels), 3):
         r, g, b = int(pixels[i]), int(pixels[i+1]), int(pixels[i+2])
-        
-        if bayer_flat is not None:
-            noise = bayer_flat[i // 3]
-            r = max(0, min(255, int(r + noise)))
-            g = max(0, min(255, int(g + noise)))
-            b = max(0, min(255, int(b + noise)))
-            
         bin_id = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4)
         
         # Check cache first
@@ -498,7 +466,7 @@ def compress_fast(pixels: bytes, width: int, height: int, quality: int) -> bytes
     K = max(16, min(256, round(16 + ((quality - 10) / 90) * 240)))
     
     pixels_arr = np.frombuffer(pixels, dtype=np.uint8)
-    palette, indices = quantize(pixels_arr, K, width, height)
+    palette, indices = quantize(pixels_arr, K)
     rle = rle_encode(indices)
     lzw_codes = lzw_encode(rle)
     
@@ -521,7 +489,7 @@ def compress_max(pixels: bytes, width: int, height: int, quality: int) -> bytes:
     K = max(16, min(256, round(16 + ((quality - 10) / 90) * 240)))
     
     pixels_arr = np.frombuffer(pixels, dtype=np.uint8)
-    palette, indices = quantize(pixels_arr, K, width, height)
+    palette, indices = quantize(pixels_arr, K)
     rle = rle_encode(indices)
     lzw_codes = lzw_encode(rle)
     
