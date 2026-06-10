@@ -135,9 +135,9 @@ export function decodeCipHeader(data: Uint8Array): CipMetadata {
   const offset0 = magicLen
 
   // Detect format by checking byte at offset0+8
-  // Old format: byte 8 is total_bits (0-255), byte 9 is p_byte, bytes 10-13 are compressed_size
-  // New format: byte 8 is p_byte, bytes 9-12 are total_bits, bytes 13-16 are compressed_size, byte 17 is method
-  const hasMethod = data.length >= offset0 + 22 && data[offset0 + 17] >= 65 && data[offset0 + 17] <= 90 // 'A'-'Z'
+  // Old format (3-byte magic): byte 8 is total_bits (0-255), byte 9 is p_byte, bytes 10-13 are compressed_size
+  // New format (4-byte magic "CIP "): byte 8 is p_byte, bytes 9-12 are total_bits, bytes 13-16 are compressed_size, byte 17 is method
+  const hasMethod = magicLen === 4 && data.length >= offset0 + 22 && data[offset0 + 17] >= 65 && data[offset0 + 17] <= 90 // 'A'-'Z'
   const oldFormat = !hasMethod
 
   const width = new DataView(data.buffer).getUint16(offset0 + 0, true)
@@ -154,13 +154,13 @@ export function decodeCipHeader(data: Uint8Array): CipMetadata {
     frequenciesCount = new DataView(data.buffer).getUint16(offset0 + 11, true)  // F stored at 11 in old format
     offset = offset0 + 13
   } else {
-    // New format: 23-byte header (after magic)
+    // New format: 23-byte header (after magic "CIP ")
     pByte = data[offset0 + 5]
     totalBits = new DataView(data.buffer).getUint32(offset0 + 6, true)
     compressedSize = new DataView(data.buffer).getUint32(offset0 + 10, true)
-    method = String.fromCharCode(data[offset0 + 14]) as 'F' | 'M'
-    frequenciesCount = new DataView(data.buffer).getUint32(offset0 + 15, true)
-    offset = offset0 + 19
+    method = String.fromCharCode(data[offset0 + 17]) as 'F' | 'M'
+    frequenciesCount = new DataView(data.buffer).getUint32(offset0 + 18, true)
+    offset = offset0 + 22
   }
 
   const palette: [number, number, number][] = []
