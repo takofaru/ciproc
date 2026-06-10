@@ -155,11 +155,18 @@ export function decodeCipHeader(data: Uint8Array): CipMetadata {
     offset = offset0 + 13
   } else {
     // New format: 23-byte header (after magic "CIP ")
+    // offset0 = 4
+    // byte 8 (offset0+4): K
+    // byte 9 (offset0+5): p_byte
+    // bytes 10-13 (offset0+6 to offset0+9): total_bits
+    // bytes 14-17 (offset0+10 to offset0+13): compressed_size
+    // byte 18 (offset0+14): method
+    // bytes 19-22 (offset0+15 to offset0+18): frequencies_count
     pByte = data[offset0 + 5]
     totalBits = new DataView(data.buffer).getUint32(offset0 + 6, true)
     compressedSize = new DataView(data.buffer).getUint32(offset0 + 10, true)
-    method = String.fromCharCode(data[offset0 + 17]) as 'F' | 'M'
-    frequenciesCount = new DataView(data.buffer).getUint32(offset0 + 18, true)
+    method = String.fromCharCode(data[offset0 + 14]) as 'F' | 'M'
+    frequenciesCount = new DataView(data.buffer).getUint32(offset0 + 15, true)
     offset = offset0 + 22
   }
 
