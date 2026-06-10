@@ -34,15 +34,6 @@ export function ExportModal({
 
     try {
       if (format === "cip") {
-<<<<<<< HEAD
-        // Run our custom 5-level compression pipeline
-        const bytes = await compressImageCipAsync(processedImage, quality, (p) => {
-          setProgress(p)
-        })
-        
-        // Trigger download
-        const blob = new Blob([bytes as BlobPart], { type: "application/octet-stream" })
-=======
         const result = await compressImage(processedImage, quality, method)
         const compressedData = atob(result.data)
         const bytes = new Uint8Array(compressedData.length)
@@ -50,14 +41,13 @@ export function ExportModal({
           bytes[i] = compressedData.charCodeAt(i)
         }
         const blob = new Blob([bytes], { type: "application/octet-stream" })
->>>>>>> 9d53ca7310ec1c784166fc4af3c9575cd5590621
         const url = URL.createObjectURL(blob)
         const link = document.createElement("a")
         link.href = url
         link.download = `${imageInputName}.cip`
         link.click()
         URL.revokeObjectURL(url)
-        setProgress({ percentage: 100, stage: `Exported: ${result.compressedSize} bytes` })
+        setProgress({ percentage: 100, stage: "Exported: " + result.compressedSize + " bytes" })
       } else {
         setProgress({ percentage: 50, stage: "Rendering image..." })
         const img = new Image()
