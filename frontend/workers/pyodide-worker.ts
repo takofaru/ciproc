@@ -38,6 +38,7 @@ async function initPyodide(): Promise<PyodideInstance> {
       morphology: new URL("./modules/morphology.py", import.meta.url),
       geometry: new URL("./modules/geometry.py", import.meta.url),
       compression: new URL("./modules/compression.py", import.meta.url),
+      segmentation: new URL("./modules/segmentation.py", import.meta.url),
     }
 
     for (const [name, url] of Object.entries(moduleUrls)) {
@@ -62,7 +63,7 @@ async function initPyodide(): Promise<PyodideInstance> {
 import sys
 
 # Clear cached imports to force a fresh reload from the filesystem
-for mod in ["image_io", "intensity", "spatial", "edge_detect", "morphology", "geometry", "compression"]:
+for mod in ["image_io", "intensity", "spatial", "edge_detect", "morphology", "geometry", "compression", "segmentation"]:
     if mod in sys.modules:
         del sys.modules[mod]
 
@@ -161,6 +162,8 @@ for op in ops:
         arr = apply_scale(arr, p)
     elif t == "crop":
         arr = apply_crop(arr, p)
+    elif t == "segmentation":
+        arr = apply_segmentation(arr, p.get("method", "kmeans"), p)
 
 # Apply geometry only on export
 if geo:
