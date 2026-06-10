@@ -134,11 +134,12 @@ export function decodeCipHeader(data: Uint8Array): CipMetadata {
   const magicLen = data[3] === 32 ? 4 : 3  // "CIP " or "CIP"
   const offset0 = magicLen
 
-  // Detect format by checking byte at offset0+8
-  // Old format (3-byte magic): byte 8 is total_bits (0-255), byte 9 is p_byte, bytes 10-13 are compressed_size
-  // New format (4-byte magic "CIP "): byte 8 is p_byte, bytes 9-12 are total_bits, bytes 13-16 are compressed_size, byte 17 is method
-  const hasMethod = magicLen === 4 && data.length >= offset0 + 22 && data[offset0 + 17] >= 65 && data[offset0 + 17] <= 90 // 'A'-'Z'
-  const oldFormat = !hasMethod
+  // Detect format by checking:
+  // - 4-byte magic "CIP " (byte 3 = 32) = new format
+  // - Has method indicator at offset0+14 (byte 18) = 'F' or 'M' = new format
+  // Old format (3-byte magic "CIP"): byte 8 is total_bits, byte 9 is p_byte
+  const isNewFormat = magicLen === 4 && data.length >= offset0 + 22 && data[offset0 + 14] >= 65 && data[offset0 + 14] <= 90; // 'A'-'Z'
+  const oldFormat = !isNewFormat
 
   const width = new DataView(data.buffer).getUint16(offset0 + 0, true)
   const height = new DataView(data.buffer).getUint16(offset0 + 2, true)
