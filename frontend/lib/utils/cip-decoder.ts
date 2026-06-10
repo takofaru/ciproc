@@ -168,7 +168,8 @@ export function decodeCipHeader(data: Uint8Array): CipMetadata {
     compressedSize = new DataView(data.buffer).getUint32(offset0 + 10, true)
     method = String.fromCharCode(data[offset0 + 14]) as 'F' | 'M'
     frequenciesCount = new DataView(data.buffer).getUint32(offset0 + 15, true)
-    offset = offset0 + 22
+    // Header size: 4-byte magic + 19-byte header = 23 bytes
+    offset = offset0 + 19
   }
 
   const palette: [number, number, number][] = []
