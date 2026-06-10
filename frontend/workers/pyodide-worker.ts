@@ -79,6 +79,7 @@ try:
     from morphology import *
     from geometry import *
     from compression import *
+    from segmentation import *
 except Exception as e:
     import traceback
     print("Error during import in Pyodide:")
@@ -120,6 +121,7 @@ from spatial import *
 from edge_detect import *
 from morphology import *
 from geometry import *
+from segmentation import *
 
 arr = decode_image(_b64_input)
 ops = json.loads(_ops_json)

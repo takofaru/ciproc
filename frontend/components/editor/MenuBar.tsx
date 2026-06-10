@@ -284,6 +284,14 @@ export function MenuBar() {
         { label: "Add Morphology Node", action: () => addNode("morphology") },
       ],
     },
+        {
+      label: "Segment",
+      items: [
+        { label: "K-Means Clustering", action: () => addNodeWithData("segmentation", { method: "kmeans" }), disabled: !sourceImage },
+        { label: "Threshold Masking",  action: () => addNodeWithData("segmentation", { method: "mask"   }), disabled: !sourceImage },
+        { label: "Region Extraction",  action: () => addNodeWithData("segmentation", { method: "region" }), disabled: !sourceImage },
+      ],
+    },
     {
       label: "View",
       items: [

@@ -21,6 +21,9 @@ export type NodeFilterType =
   | "hsl"
   | "threshold"
   | "morphology"
+  | "segmentation"
+  | "scale"
+  | "crop"
   | "output"
 
 export type EditorNodeData = {
@@ -46,6 +49,15 @@ export type EditorNodeData = {
   cropY?: number
   cropW?: number
   cropH?: number
+  // Segmentation
+  k?: number
+  iterations?: number
+  low?: number
+  high?: number
+  maskMode?: string
+  threshold?: number
+  minSize?: number
+  regionMode?: string
 
   disabled?: boolean
 }

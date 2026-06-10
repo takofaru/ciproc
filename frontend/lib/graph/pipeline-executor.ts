@@ -71,11 +71,22 @@ export function buildPipeline(nodes: EditorNode[], edges: EditorEdge[]): Op[] {
       params.y      = node.data.cropY      ?? 0
       params.width  = node.data.cropW  ?? 0
       params.height = node.data.cropH ?? 0
+    } else if (node.type === "segmentation") {
+      params.method     = node.data.method     ?? "kmeans"
+      params.k          = node.data.k          ?? 4
+      params.iterations = node.data.iterations ?? 8
+      params.low        = node.data.low        ?? 80
+      params.high       = node.data.high       ?? 200
+      params.channel    = node.data.channel    ?? "gray"
+      params.maskMode   = node.data.maskMode   ?? "extract"
+      params.threshold  = node.data.threshold  ?? 128
+      params.minSize    = node.data.minSize    ?? 300
+      params.regionMode = node.data.regionMode ?? "all"
     }
 
     ops.push({ type: node.type!, params })
     currentId = nextMap.get(currentId)
-  }
+  } 
 
   return ops
 }
