@@ -151,8 +151,15 @@ export function decompressCip(data: Uint8Array): { pixels: Uint8Array; width: nu
   const P_SCALE = 65536;
   const pMin = Math.floor(Math.max(0, (meta.pByte - 0.5) / 255) * P_SCALE);
   const pMax = Math.ceil(Math.min(1, (meta.pByte + 0.5) / 255) * P_SCALE);
+  const pCenter = Math.round((meta.pByte / 255) * P_SCALE);
 
+  const pIntCandidates: number[] = [];
   for (let pInt = pMin; pInt <= pMax; pInt++) {
+    pIntCandidates.push(pInt);
+  }
+  pIntCandidates.sort((a, b) => Math.abs(a - pCenter) - Math.abs(b - pCenter));
+
+  for (const pInt of pIntCandidates) {
     try {
       const bits = arithmeticDecode(meta.compressedBytes, pInt, meta.totalBits);
       const huffmanBytes = huffmanDecode(bits, meta.frequencies);

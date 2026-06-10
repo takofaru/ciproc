@@ -11,7 +11,7 @@ def quantize(pixels: np.ndarray, K: int) -> tuple[np.ndarray, np.ndarray]:
     """Color quantization using Median Cut algorithm."""
     bins = {}
     for i in range(0, len(pixels), 3):
-        r, g, b = pixels[i], pixels[i+1], pixels[i+2]
+        r, g, b = int(pixels[i]), int(pixels[i+1]), int(pixels[i+2])
         bin_id = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4)
         if bin_id not in bins:
             bins[bin_id] = {'r_sum': 0, 'g_sum': 0, 'b_sum': 0, 'count': 0}
@@ -35,20 +35,29 @@ def quantize(pixels: np.ndarray, K: int) -> tuple[np.ndarray, np.ndarray]:
             self.items = items
             self.total_count = sum(item['count'] for item in items)
 
-        def get_range(self):
-            min_r, max_r = 255, 0
-            min_g, max_g = 255, 0
-            min_b, max_b = 255, 0
-            for item in self.items:
-                min_r, max_r = min(min_r, item['r']), max(max_r, item['r'])
-                min_g, max_g = min(min_g, item['g']), max(max_g, item['g'])
-                min_b, max_b = min(min_b, item['b']), max(max_b, item['b'])
-            r_range, g_range, b_range = max_r - min_r, max_g - min_g, max_b - min_b
-            if r_range >= g_range and r_range >= b_range:
-                return 'r', r_range
-            elif g_range >= r_range and g_range >= b_range:
-                return 'g', g_range
-            return 'b', b_range
+        def get_variance_channel(self):
+            if len(self.items) == 0:
+                return 'r', 0
+            
+            # Compute mean
+            r_sum = sum(item['r'] * item['count'] for item in self.items)
+            g_sum = sum(item['g'] * item['count'] for item in self.items)
+            b_sum = sum(item['b'] * item['count'] for item in self.items)
+            
+            r_mean = r_sum / self.total_count
+            g_mean = g_sum / self.total_count
+            b_mean = b_sum / self.total_count
+            
+            # Compute variance
+            r_var = sum(item['count'] * (item['r'] - r_mean)**2 for item in self.items)
+            g_var = sum(item['count'] * (item['g'] - g_mean)**2 for item in self.items)
+            b_var = sum(item['count'] * (item['b'] - b_mean)**2 for item in self.items)
+            
+            if r_var >= g_var and r_var >= b_var:
+                return 'r', r_var
+            elif g_var >= r_var and g_var >= b_var:
+                return 'g', g_var
+            return 'b', b_var
 
     boxes = [Box(items)]
     while len(boxes) < K:
@@ -56,14 +65,17 @@ def quantize(pixels: np.ndarray, K: int) -> tuple[np.ndarray, np.ndarray]:
         for i, box in enumerate(boxes):
             if len(box.items) < 2:
                 continue
-            channel, rng = box.get_range()
-            metric = rng * box.total_count
+            channel, var = box.get_variance_channel()
+            # We no longer multiply by box.total_count because the variance calculation
+            # above already sums the squared deviations weighted by count, which is 
+            # effectively total_count * variance (the total squared error).
+            metric = var
             if metric > max_metric:
                 max_metric, best_idx = metric, i
         if best_idx == -1:
             break
         box = boxes[best_idx]
-        channel, _ = box.get_range()
+        channel, _ = box.get_variance_channel()
         box.items.sort(key=lambda x: x[channel])
         half_weight = box.total_count / 2
         accumulated = 0
@@ -94,18 +106,24 @@ def quantize(pixels: np.ndarray, K: int) -> tuple[np.ndarray, np.ndarray]:
 
     num_pixels = len(pixels) // 3
     indices = np.zeros(num_pixels, dtype=np.uint8)
-    for i in range(num_pixels):
-        r, g, b = pixels[i*3], pixels[i*3+1], pixels[i*3+2]
+    for i in range(0, len(pixels), 3):
+        r, g, b = int(pixels[i]), int(pixels[i+1]), int(pixels[i+2])
         bin_id = ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4)
+        
+        # Check cache first
         if bin_id in bin_to_idx:
-            indices[i] = bin_to_idx[bin_id]
-        else:
-            min_dist, best_idx = float('inf'), 0
-            for k, (pr, pg, pb) in enumerate(palette):
-                dist = (r-pr)**2 + (g-pg)**2 + (b-pb)**2
-                if dist < min_dist:
-                    min_dist, best_idx = dist, k
-            indices[i] = best_idx
+            indices[i // 3] = bin_to_idx[bin_id]
+            continue
+            
+        # Find closest palette color
+        min_dist = float('inf')
+        best_idx = 0
+        for j, (pr, pg, pb) in enumerate(palette):
+            pr, pg, pb = int(pr), int(pg), int(pb)
+            dist = (r-pr)**2 + (g-pg)**2 + (b-pb)**2
+            if dist < min_dist:
+                min_dist, best_idx = dist, j
+        indices[i // 3] = best_idx
 
     return np.array(palette, dtype=np.uint8), indices
 
@@ -497,12 +515,18 @@ def decompress(data: bytes) -> tuple[bytes, int, int]:
     method = metadata['method']
     
     P_SCALE = 65536
-    p_min = int(max(0, (metadata['p_byte'] - 0.5) / 255) * P_SCALE)
-    p_max = int(min(1, (metadata['p_byte'] + 0.5) / 255) * P_SCALE) + 1
-
+    p_byte = metadata['p_byte']
+    
+    p_min = int(max(0, (p_byte - 0.5) / 255.0) * P_SCALE)
+    p_max = int(min(1, (p_byte + 0.5) / 255.0) * P_SCALE)
+    p_center = int(round((p_byte / 255.0) * P_SCALE))
+    
+    p_candidates = list(range(p_min, p_max + 1))
+    p_candidates.sort(key=lambda x: abs(x - p_center))
+    
     last_error = None
     
-    for p_int in range(p_min, p_max + 1):
+    for p_int in p_candidates:
         try:
             # Custom arithmetic decode with exact p_int
             input_bits = []
