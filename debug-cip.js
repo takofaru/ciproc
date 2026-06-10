@@ -2,7 +2,7 @@
 const fs = require('fs');
 
 // Read Test.cip
-const data = fs.readFileSync('/media/windows/Users/takofaru/Data/tugas/semester-4/project/ciproc/Test.cip');
+const data = fs.readFileSync('/home/takofaru/Data/tugas/semester-4/project/ciproc/Test.cip');
 console.log('=== Test.cip Analysis ===');
 console.log('File size:', data.length);
 console.log('Magic (bytes 0-3):', data.slice(0, 4).toString());
@@ -13,9 +13,8 @@ console.log('magicLen:', magicLen);
 console.log('offset0:', offset0);
 
 // Check if new format (has method indicator)
-const hasMethod = magicLen === 4 && data.length >= offset0 + 22 && data[offset0 + 17] >= 65 && data[offset0 + 17] <= 90;
-console.log('hasMethod (checks offset0+17):', hasMethod, 'data[offset0+17]:', data[offset0 + 17]);
-console.log('data[offset0+17] is method char?', data[offset0 + 17] >= 65 && data[offset0 + 17] <= 90);
+const hasMethod = magicLen === 4 && data.length >= offset0 + 22 && data[offset0 + 14] >= 65 && data[offset0 + 14] <= 90;
+console.log('isNewFormat (checks offset0+14):', hasMethod, 'data[offset0+14]:', data[offset0 + 14]);
 
 // What the JS decoder sees
 const width = data.readUInt16LE(offset0 + 0);
@@ -37,30 +36,39 @@ console.log('  compressedSize:', compressedSize);
 console.log('  method:', method);
 console.log('  frequenciesCount:', frequenciesCount);
 
-// Calculate offsets
-const paletteEnd = offset0 + 22 + k * 3;
-const freqEnd = paletteEnd + frequenciesCount * 5;
-const compressedEnd = freqEnd + compressedSize;
+// Header structure for NEW format (4-byte magic "CIP "):
+// offset0 = 4
+// Bytes 4-5 (offset0+0): width
+// Bytes 6-7 (offset0+2): height
+// Byte 8 (offset0+4): K (palette size)
+// Byte 9 (offset0+5): p_byte
+// Bytes 10-13 (offset0+6 to offset0+9): total_bits
+// Bytes 14-17 (offset0+10 to offset0+13): compressed_size
+// Byte 18 (offset0+14): method ('F' or 'M')
+// Bytes 19-22 (offset0+15 to offset0+18): frequencies_count
+// Total header = 4 + 19 = 23 bytes
+// Palette starts at: 23 (after header)
+// Frequencies start at: 23 + K*3
+// Compressed data starts at: 23 + K*3 + frequenciesCount*5
 
-console.log('\nOffset calculations:');
-console.log('  Palette starts at:', offset0 + 22);
-console.log('  Palette ends at:', paletteEnd, '(size:', k * 3, ')');
-console.log('  Frequencies starts at:', paletteEnd);
-console.log('  Frequencies ends at:', freqEnd, '(size:', frequenciesCount * 5, ')');
-console.log('  Compressed data starts at:', freqEnd);
-console.log('  Compressed data ends at:', compressedEnd, '(size:', compressedSize, ')');
+const headerSize = 23; // 4-byte magic + 19-byte header
+const paletteStart = headerSize;
+const paletteSize = k * 3;
+const freqStart = paletteStart + paletteSize;
+const freqSize = frequenciesCount * 5;
+const compressedStart = freqStart + freqSize;
+
+console.log('\n=== Correct offset calculations ===');
+console.log('  Header starts at: 0');
+console.log('  Header ends at:', headerSize - 1);
+console.log('  Palette starts at:', paletteStart);
+console.log('  Palette ends at:', paletteStart + paletteSize - 1, '(size:', paletteSize, ')');
+console.log('  Frequencies starts at:', freqStart);
+console.log('  Frequencies ends at:', freqStart + freqSize - 1, '(size:', freqSize, ')');
+console.log('  Compressed data starts at:', compressedStart);
+console.log('  Compressed data ends at:', compressedStart + compressedSize - 1, '(size:', compressedSize, ')');
 console.log('  File size:', data.length);
 
-if (compressedEnd !== data.length) {
-  console.log('\nERROR: compressedEnd (', compressedEnd, ') != file size (', data.length, ')');
+if (compressedStart + compressedSize !== data.length) {
+  console.log('\nERROR: compressedEnd (', compressedStart + compressedSize, ') != file size (', data.length, ')');
 }
-
-// Show actual bytes at key positions
-console.log('\n=== Bytes at key positions ===');
-console.log('Bytes 0-3 (magic):', [...data.slice(0, 4)]);
-console.log('Bytes 4-7 (width,height):', [...data.slice(4, 8)]);
-console.log('Bytes 8-9 (K, p_byte):', [...data.slice(8, 10)]);
-console.log('Bytes 10-13 (total_bits):', [...data.slice(10, 14)]);
-console.log('Bytes 14-17 (compressed_size):', [...data.slice(14, 18)]);
-console.log('Bytes 18 (method):', data[18], '->', String.fromCharCode(data[18]));
-console.log('Bytes 19-22 (freq_count):', [...data.slice(19, 23)]);
