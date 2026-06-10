@@ -131,8 +131,9 @@ def rle_decode(rle: np.ndarray, total_pixels: int) -> np.ndarray:
     """Decode RLE."""
     indices = np.zeros(total_pixels, dtype=np.uint8)
     idx = 0
-    for i in range(0, len(rle), 2):
-        val, length = rle[i], rle[i+1]
+    for i in range(0, len(rle) - 1, 2):
+        val = rle[i]
+        length = int(rle[i+1])
         indices[idx:idx+length] = val
         idx += length
     return indices
@@ -495,31 +496,87 @@ def decompress(data: bytes) -> tuple[bytes, int, int]:
     metadata = deserialize_cip(data)
     method = metadata['method']
     
-    # Arithmetic decode
-    bits = arithmetic_decode(metadata['compressed_bytes'], metadata['p_byte'], metadata['total_bits'])
+    P_SCALE = 65536
+    p_min = int(max(0, (metadata['p_byte'] - 0.5) / 255) * P_SCALE)
+    p_max = int(min(1, (metadata['p_byte'] + 0.5) / 255) * P_SCALE) + 1
+
+    last_error = None
     
-    # Huffman decode
-    huffman_bytes = huffman_decode(bits, metadata['frequencies'])
-    
-    # LZW decode
-    lzw_codes = np.zeros(len(huffman_bytes) // 2, dtype=np.uint16)
-    for i in range(len(lzw_codes)):
-        lzw_codes[i] = (huffman_bytes[i*2] << 8) | huffman_bytes[i*2+1]
-    rle = lzw_decode(lzw_codes)
-    
-    # RLE decode
-    total_pixels = metadata['width'] * metadata['height']
-    indices = rle_decode(rle, total_pixels)
-    
-    # Reconstruct pixels
-    pixels = bytearray(total_pixels * 3)
-    for i, idx in enumerate(indices):
-        r, g, b = metadata['palette'][idx]
-        pixels[i*3] = r
-        pixels[i*3+1] = g
-        pixels[i*3+2] = b
-    
-    return bytes(pixels), metadata['width'], metadata['height']
+    for p_int in range(p_min, p_max + 1):
+        try:
+            # Custom arithmetic decode with exact p_int
+            input_bits = []
+            for byte in metadata['compressed_bytes']:
+                for i in range(7, -1, -1):
+                    input_bits.append((byte >> i) & 1)
+            
+            bit_ptr = 0
+            def read_bit():
+                nonlocal bit_ptr
+                if bit_ptr < len(input_bits):
+                    b = input_bits[bit_ptr]
+                    bit_ptr += 1
+                    return b
+                return 0
+            
+            value = 0
+            for _ in range(32):
+                value = ((value << 1) | read_bit()) & 0xFFFFFFFF
+            
+            low, high = 0, 0xFFFFFFFF
+            bits = []
+            for _ in range(metadata['total_bits']):
+                range_size = high - low + 1
+                split = low + (range_size * (P_SCALE - p_int)) // P_SCALE
+                if value <= split:
+                    bits.append(0)
+                    high = split
+                else:
+                    bits.append(1)
+                    low = split + 1
+                
+                while True:
+                    if (low & 0x80000000) == (high & 0x80000000):
+                        low = ((low << 1) & 0xFFFFFFFF)
+                        high = (((high << 1) | 1) & 0xFFFFFFFF)
+                        value = ((value << 1) | read_bit()) & 0xFFFFFFFF
+                    elif (low & 0x40000000) != 0 and (high & 0x40000000) == 0:
+                        low = (((low << 1) ^ 0x80000000) & 0xFFFFFFFF)
+                        high = ((((high << 1) ^ 0x80000000) | 1) & 0xFFFFFFFF)
+                        value = (((value << 1) ^ 0x80000000) | read_bit()) & 0xFFFFFFFF
+                    else:
+                        break
+            
+            # Huffman decode
+            huffman_bytes = huffman_decode(bits, metadata['frequencies'])
+            if len(huffman_bytes) % 2 != 0:
+                continue
+            
+            # LZW decode
+            lzw_codes = np.zeros(len(huffman_bytes) // 2, dtype=np.uint16)
+            for i in range(len(lzw_codes)):
+                lzw_codes[i] = (huffman_bytes[i*2] << 8) | huffman_bytes[i*2+1]
+            rle = lzw_decode(lzw_codes)
+            
+            # RLE decode
+            total_pixels = metadata['width'] * metadata['height']
+            indices = rle_decode(rle, total_pixels)
+            
+            # Reconstruct pixels
+            pixels = bytearray(total_pixels * 3)
+            for i, idx in enumerate(indices):
+                r, g, b = metadata['palette'][idx]
+                pixels[i*3] = r
+                pixels[i*3+1] = g
+                pixels[i*3+2] = b
+            
+            return bytes(pixels), metadata['width'], metadata['height']
+            
+        except Exception as e:
+            last_error = e
+            continue
+            
+    raise ValueError(f"Failed to decompress CIP: all p_int candidates failed. Last error: {last_error}")
 
 
 def compress_image(pixels: bytes, width: int, height: int, quality: int, 

@@ -6,7 +6,7 @@ interface HuffmanNode {
   right?: HuffmanNode
 }
 
-function huffmanDecode(bits: number[], frequencies: [number, number][]): Uint8Array {
+export function huffmanDecode(bits: number[], frequencies: [number, number][]): Uint8Array {
   const pq: HuffmanNode[] = []
   for (const [symbol, freq] of frequencies) {
     pq.push({ symbol, freq })
@@ -72,47 +72,113 @@ export function rleDecode(rle: number[], totalPixels: number): Uint8Array {
     const val = rle[i]
     const length = rle[i + 1]
     for (let j = 0; j < length; j++) {
-      indices[idx++] = val
+      if (idx < totalPixels) {
+        indices[idx++] = val
+      } else {
+        throw new Error(`RLE decode error: too many pixels`)
+      }
     }
+  }
+  if (idx !== totalPixels) {
+    throw new Error(`RLE decode error: decoded ${idx} pixels, expected ${totalPixels}`)
   }
   return indices
 }
 
-// ── Main Decompress Function ────────────────────────────────────────
-export function decompressCip(data: Uint8Array): { pixels: Uint8Array; width: number; height: number } {
-  const meta = decodeCipHeader(data)
+// ── Arithmetic Decode (pure JS) ─────────────────────────────────────────
+function arithmeticDecode(data: Uint8Array, pInt: number, totalBits: number): number[] {
+  const P_SCALE = 65536;
 
-  // Decode compressed bytes to bits
-  const bits: number[] = []
-  for (let i = 0; i < meta.compressedBytes.length; i++) {
+  const inputBits: number[] = [];
+  for (let i = 0; i < data.length; i++) {
     for (let bitIdx = 7; bitIdx >= 0; bitIdx--) {
-      bits.push((meta.compressedBytes[i] >> bitIdx) & 1)
+      inputBits.push((data[i] >> bitIdx) & 1);
     }
   }
 
-  // Huffman decode
-  const huffmanBytes = huffmanDecode(bits, meta.frequencies)
-
-  // LZW decode
-  const lzwCodes: number[] = []
-  for (let i = 0; i < huffmanBytes.length; i += 2) {
-    lzwCodes.push((huffmanBytes[i] << 8) | huffmanBytes[i + 1])
-  }
-  const rleStream = lzwDecode(lzwCodes)
-
-  // RLE decode
-  const indices = rleDecode(rleStream, meta.width * meta.height)
-
-  // Reconstruct pixels
-  const pixels = new Uint8Array(meta.width * meta.height * 3)
-  for (let i = 0; i < indices.length; i++) {
-    const [r, g, b] = meta.palette[indices[i]]
-    pixels[i * 3] = r
-    pixels[i * 3 + 1] = g
-    pixels[i * 3 + 2] = b
+  let bitPtr = 0;
+  function readBit() {
+    if (bitPtr < inputBits.length) {
+      return inputBits[bitPtr++];
+    }
+    return 0;
   }
 
-  return { pixels, width: meta.width, height: meta.height }
+  let value = 0;
+  for (let i = 0; i < 32; i++) {
+    value = ((value * 2) + readBit()) >>> 0;
+  }
+
+  let low = 0;
+  let high = 0xFFFFFFFF;
+  const decoded: number[] = [];
+
+  for (let i = 0; i < totalBits; i++) {
+    const rangeSize = high - low + 1; // 4294967296 max, safe in double
+    const split = (low + Math.floor((rangeSize * (P_SCALE - pInt)) / P_SCALE)) >>> 0;
+
+    if ((value >>> 0) <= (split >>> 0)) {
+      decoded.push(0);
+      high = split;
+    } else {
+      decoded.push(1);
+      low = (split + 1) >>> 0;
+    }
+
+    while (true) {
+      if ((low & 0x80000000) === (high & 0x80000000)) {
+        low = (low << 1) >>> 0;
+        high = ((high << 1) | 1) >>> 0;
+        value = ((value << 1) | readBit()) >>> 0;
+      } else if ((low & 0x40000000) !== 0 && (high & 0x40000000) === 0) {
+        low = ((low << 1) ^ 0x80000000) >>> 0;
+        high = (((high << 1) ^ 0x80000000) | 1) >>> 0;
+        value = (((value << 1) ^ 0x80000000) | readBit()) >>> 0;
+      } else {
+        break;
+      }
+    }
+  }
+
+  return decoded;
+}
+
+// ── Main Decompress Function ────────────────────────────────────────
+export function decompressCip(data: Uint8Array): { pixels: Uint8Array; width: number; height: number; colors: number } {
+  const meta = decodeCipHeader(data);
+  const totalPixels = meta.width * meta.height;
+
+  const P_SCALE = 65536;
+  const pMin = Math.floor(Math.max(0, (meta.pByte - 0.5) / 255) * P_SCALE);
+  const pMax = Math.ceil(Math.min(1, (meta.pByte + 0.5) / 255) * P_SCALE);
+
+  for (let pInt = pMin; pInt <= pMax; pInt++) {
+    try {
+      const bits = arithmeticDecode(meta.compressedBytes, pInt, meta.totalBits);
+      const huffmanBytes = huffmanDecode(bits, meta.frequencies);
+      if (huffmanBytes.length % 2 !== 0) continue;
+
+      const lzwCodes: number[] = [];
+      for (let i = 0; i < huffmanBytes.length; i += 2) {
+        lzwCodes.push((huffmanBytes[i] << 8) | huffmanBytes[i + 1]);
+      }
+      const rleStream = lzwDecode(lzwCodes);
+      const indices = rleDecode(rleStream, totalPixels);
+
+      const pixels = new Uint8Array(totalPixels * 3);
+      for (let i = 0; i < indices.length; i++) {
+        const [r, g, b] = meta.palette[indices[i]];
+        pixels[i * 3] = r;
+        pixels[i * 3 + 1] = g;
+        pixels[i * 3 + 2] = b;
+      }
+      return { pixels, width: meta.width, height: meta.height, colors: meta.palette.length };
+    } catch (e) {
+      // Ignore and try next pInt
+    }
+  }
+
+  throw new Error("Failed to decode CIP file: All p_int candidates failed");
 }
 
 export interface CipMetadata {

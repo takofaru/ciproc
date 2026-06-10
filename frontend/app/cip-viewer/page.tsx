@@ -42,13 +42,9 @@ export default function CipViewerPage() {
       if (bytes[0] !== 67 || bytes[1] !== 73 || bytes[2] !== 80) {
         throw new Error("Invalid .cip file")
       }
-      const view = new DataView(bytes.buffer)
-      const width = view.getUint16(3, true)
-      const height = view.getUint16(5, true)
-      const colors = view.getUint8(7)
 
       // Decompress using pure JS
-      const { pixels } = decompressCip(bytes)
+      const { pixels, width, height, colors } = decompressCip(bytes)
       
       // Convert to data URL
       const canvas = document.createElement("canvas")
@@ -59,7 +55,7 @@ export default function CipViewerPage() {
       
       const imgData = ctx.createImageData(width, height)
       for (let i = 0; i < pixels.length; i += 3) {
-        const idx = i * 4
+        const idx = (i / 3) * 4
         imgData.data[idx] = pixels[i]
         imgData.data[idx + 1] = pixels[i + 1]
         imgData.data[idx + 2] = pixels[i + 2]
