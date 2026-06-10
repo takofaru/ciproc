@@ -34,6 +34,19 @@ export type EditorNodeData = {
   saturation?: number
   luminance?: number
   size?: number
+  // untuk scale
+  mode?: "percent" | "pixel"
+  scaleW?: number
+  scaleH?: number
+  width?: number
+  height?: number
+  keepAspect?: number
+  // Crop
+  cropX?: number
+  cropY?: number
+  cropW?: number
+  cropH?: number
+
   disabled?: boolean
 }
 

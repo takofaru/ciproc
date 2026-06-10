@@ -10,6 +10,7 @@ import { executePipeline } from "@/lib/graph/pipeline-executor"
 import { nanoid } from "nanoid"
 import { ExportModal } from "./ExportModal"
 import { CipViewerModal } from "./CipViewerModal"
+import { useCropStore } from "@/stores/crop-store"
 
 // ── Types ────────────────────────────────────────────────────
 type MenuItemDef =
@@ -62,6 +63,9 @@ export function MenuBar() {
   const redo = useGraphStore((s) => s.redo)
   const canUndo = useGraphStore((s) => s.history.length > 0)
   const canRedo = useGraphStore((s) => s.future.length > 0)
+
+  const activate = useCropStore((s) => s.activate)
+  const isActive = useCropStore((s) => s.isActive)
 
   const router = useRouter()
   const [openMenu, setOpenMenu] = useState<string | null>(null)
@@ -200,6 +204,21 @@ export function MenuBar() {
     setNodes(updatedNodes)
   }, [nodes, setNodes])
 
+  const handleAddScale = useCallback(() => {
+    addNode("scale")
+  }, [addNode])
+
+  const handleAddCrop = useCallback(() => {
+    const id = nanoid()
+    snapshot()
+    const offset = (nodes.length % 6) * 40
+    setNodes([
+      ...nodes,
+      { id, type: "crop", position: { x: 200 + offset, y: 100 + offset }, data: {} },
+    ])
+    activate(id)
+  }, [nodes, setNodes, snapshot, activate])
+
   // ── Menu definitions — computed OUTSIDE JSX via useMemo equivalent ──
   // Semua item hanya menyimpan referensi fungsi, tidak mengakses ref.current
   const menus: MenuDef[] = [
@@ -234,6 +253,9 @@ export function MenuBar() {
     {
       label: "Image",
       items: [
+        { label: "Scale / Resize",  action: handleAddScale, disabled: !sourceImage },
+        { label: "Crop…",           action: handleAddCrop,  disabled: !sourceImage || isActive },
+        { separator: true },
         { label: "Flip Horizontal", disabled: !sourceImage, action: () => setImageTransform({ scaleX: imageTransform.scaleX * -1 }) },
         { label: "Flip Vertical",   disabled: !sourceImage, action: () => setImageTransform({ scaleY: imageTransform.scaleY * -1 }) },
         { separator: true },

@@ -4,6 +4,7 @@ import Image from "next/image"
 
 import { useRef, useEffect, useCallback, useState } from "react"
 import { useCanvasStore } from "@/stores/canvas-store"
+import { CropOverlay } from "./CropOverlay"
 
 export function CanvasPreview() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -180,6 +181,7 @@ export function CanvasPreview() {
           onMouseUp={onMouseUp}
           onMouseLeave={onMouseUp}
         />
+        <CropOverlay containerRef={containerRef} />
         {!processedImage && (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-zinc-600 pointer-events-none select-none gap-2">
             <svg width="48" height="48" viewBox="0 0 48 48" fill="none">

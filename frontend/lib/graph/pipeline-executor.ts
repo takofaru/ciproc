@@ -59,6 +59,18 @@ export function buildPipeline(nodes: EditorNode[], edges: EditorEdge[]): Op[] {
     } else if (node.type === "morphology") {
       params.method = node.data.method ?? "erosion"
       params.size = node.data.size ?? 3
+    } else if (node.type === "scale") {
+      params.mode       = node.data.mode       ?? "percent"
+      params.scaleW     = node.data.scaleW     ?? 100
+      params.scaleH     = node.data.scaleH     ?? 100
+      params.width      = node.data.width      ?? 0
+      params.height     = node.data.height     ?? 0
+      params.keepAspect = node.data.keepAspect ?? 1
+    } else if (node.type === "crop") {
+      params.x      = node.data.cropX      ?? 0
+      params.y      = node.data.cropY      ?? 0
+      params.width  = node.data.cropW  ?? 0
+      params.height = node.data.cropH ?? 0
     }
 
     ops.push({ type: node.type!, params })
@@ -75,5 +87,5 @@ export async function executePipeline(
   geometryParams?: Record<string, number>
 ): Promise<string> {
   const ops = buildPipeline(nodes, edges)
-  return processImage(sourceImage, ops as any, geometryParams)
+  return processImage(sourceImage, ops, geometryParams)
 }

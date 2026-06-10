@@ -153,6 +153,10 @@ for op in ops:
         arr = apply_threshold(arr, p.get("value", 128))
     elif t == "morphology":
         arr = apply_morphology(arr, p.get("method", "erosion"), int(p.get("size", 3)))
+    elif t == "scale":
+        arr = apply_scale(arr, p)
+    elif t == "crop":
+        arr = apply_crop(arr, p)
 
 # Apply geometry only on export
 if geo:

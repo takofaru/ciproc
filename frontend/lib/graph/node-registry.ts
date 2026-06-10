@@ -14,6 +14,8 @@ import { HSLNode } from "@/components/graph/nodes/HSLNode"
 import { ThresholdNode } from "@/components/graph/nodes/ThresholdNode"
 import { MorphologyNode } from "@/components/graph/nodes/MorphologyNode"
 import { OutputNode } from "@/components/graph/nodes/OutputNode"
+import { ScaleNode } from "@/components/graph/nodes/ScaleNode"
+import { CropNode } from "@/components/graph/nodes/CropNode"
 
 export const nodeTypes: NodeTypes = {
   imageInput: ImageInputNode,
@@ -31,6 +33,8 @@ export const nodeTypes: NodeTypes = {
   threshold: ThresholdNode,
   morphology: MorphologyNode,
   output: OutputNode,
+  scale: ScaleNode,
+  crop: CropNode,
 }
 
 export const NODE_CATALOG = [
@@ -48,5 +52,7 @@ export const NODE_CATALOG = [
   { type: "sharpen",      label: "Sharpen",      group: "Convolve",  color: "#34d399" },
   { type: "edge",         label: "Edge Detect",  group: "Convolve",  color: "#fb7185" },
   { type: "morphology",   label: "Morphology",   group: "Convolve",  color: "#f43f5e" },
+  { type: "scale",  label: "Scale/Resize", group: "Transform", color: "#818cf8" },
+  { type: "crop",   label: "Crop",         group: "Transform", color: "#f59e0b" },
   { type: "output",       label: "Output",       group: "Sink",      color: "#f472b6" },
 ]

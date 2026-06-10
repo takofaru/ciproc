@@ -39,7 +39,7 @@ export function ExportModal({
         })
         
         // Trigger download
-        const blob = new Blob([bytes as any], { type: "application/octet-stream" })
+        const blob = new Blob([bytes as BlobPart], { type: "application/octet-stream" })
         const url = URL.createObjectURL(blob)
         const link = document.createElement("a")
         link.href = url

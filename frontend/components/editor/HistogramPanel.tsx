@@ -127,31 +127,6 @@ export function HistogramPanel() {
   const [loadingBefore, setLoadingBefore] = useState(false)
   const [loadingAfter, setLoadingAfter] = useState(false)
 
-  // Compute before histogram once when active input image changes
-  useEffect(() => {
-    if (!activeInputImage || !isPyodideReady) {
-      setBeforeData(null)
-      return
-    }
-
-    let isMounted = true
-    setLoadingBefore(true)
-    computeHistogram(activeInputImage)
-      .then((data) => {
-        if (isMounted) {
-          setBeforeData(data)
-        }
-      })
-      .catch(console.error)
-      .finally(() => {
-        if (isMounted) setLoadingBefore(false)
-      })
-
-    return () => {
-      isMounted = false
-    }
-  }, [activeInputImage, isPyodideReady])
-
   // Compute after histogram when processedImage changes
   useEffect(() => {
     if (!isPyodideReady) {

@@ -38,3 +38,38 @@ def apply_geometry(arr: np.ndarray, params: dict) -> np.ndarray:
         img = canvas
 
     return np.array(img, dtype=np.float32)
+
+def apply_scale(arr: np.ndarray, params: dict) -> np.ndarray:
+    img = Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8))
+    mode = params.get("mode", "percent")
+    keep_aspect = bool(params.get("keepAspect", True))
+
+    if mode == "percent":
+        sw = params.get("scaleW", 100.0) / 100.0
+        sh = params.get("scaleH", 100.0) / 100.0
+        if keep_aspect:
+            sw = sh = (sw + sh) / 2.0
+        new_w = max(1, int(img.width  * sw))
+        new_h = max(1, int(img.height * sh))
+    else:
+        new_w = max(1, int(params.get("width",  img.width)))
+        new_h = max(1, int(params.get("height", img.height)))
+        if keep_aspect:
+            ratio = min(new_w / img.width, new_h / img.height)
+            new_w = max(1, int(img.width  * ratio))
+            new_h = max(1, int(img.height * ratio))
+
+    img = img.resize((new_w, new_h), Image.BICUBIC)
+    return np.array(img, dtype=np.float32)
+
+
+def apply_crop(arr: np.ndarray, params: dict) -> np.ndarray:
+    img = Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8))
+    x  = max(0, int(params.get("x", 0)))
+    y  = max(0, int(params.get("y", 0)))
+    w  = max(1, int(params.get("width",  img.width)))
+    h  = max(1, int(params.get("height", img.height)))
+    x2 = min(img.width,  x + w)
+    y2 = min(img.height, y + h)
+    img = img.crop((x, y, x2, y2))
+    return np.array(img, dtype=np.float32)

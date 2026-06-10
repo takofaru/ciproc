@@ -8,6 +8,6 @@
 import { projectApi as realApi } from "./project-api"
 import { mockProjectApi } from "./mock-project-api"
 
-const USE_MOCK = true
+const USE_MOCK = false
 
 export const projectApi = USE_MOCK ? mockProjectApi : realApi

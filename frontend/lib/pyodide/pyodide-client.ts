@@ -69,7 +69,7 @@ export async function initPyodideWorker(): Promise<void> {
 
 export async function processImage(
   imageB64: string,
-  ops: Array<{ type: string; params: Record<string, number> }>,
+  ops: Array<{ type: string; params: Record<string, string | number> }>,
   geometryParams?: Record<string, number>
 ): Promise<string> {
   const w = getWorker()
